@@ -24,6 +24,7 @@ from btc_research.setups.s3_retest import run_s3
 from btc_research.setups.s4_range import run_s4
 from btc_research.setups.w1_swing import run_w1
 from btc_research.setups.hunt_cfi import run_hunt
+from btc_research.setups.hunt_lookback import run_hunt20
 
 
 def main() -> None:
@@ -46,9 +47,10 @@ def main() -> None:
         "exp-hunt-cfi-v1",
         "exp-hunt-cfi-limit-v1",
         "exp-hunt-cfi-level-v1",
+        "exp-hunt-lookback-20-v1",
     }
     if args.experiment not in allowed:
-        raise SystemExit("Implemented experiments: S1 family, S2, S3, S4, W1, Hunt next-open, Hunt limit, Hunt level fill.")
+        raise SystemExit("Implemented experiments include Hunt level fill and Hunt 20-bar lookback.")
     db = research_db_path(args.db)
     start = _ms(args.start or cfg.get("start"))
     end = _ms(args.end or cfg.get("end"))
@@ -79,6 +81,9 @@ def main() -> None:
         bars_4h = resample(bars, "4h")
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)} 4h={len(bars_4h)}")
         trades, skips = run_hunt(bars, bars_5, bars_15, bars_4h, cfg, sides)
+    elif family == "HUNT20":
+        print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
+        trades, skips = run_hunt20(bars, bars_5, bars_15, cfg, sides)
     else:
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
         trades, skips = run_s2(bars, bars_5, bars_15, cfg, sides)
