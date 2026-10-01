@@ -1,0 +1,22 @@
+{
+  "experiment_id": "exp-hunt-lookback-20-v1",
+  "family": "HUNT20",
+  "description": "15m close beyond the prior 20-bar high or low. 5m break of the prior 50-bar high or low on this bar only. Pullback tap required. Fill is the first 1m touch inside that 5m bar. No rearm. No level-after-close fill.",
+  "symbol": "BTC_USDT",
+  "sides": ["LONG", "SHORT"],
+  "lookback_15": 20,
+  "lookback_5": 50,
+  "atr_period": 14,
+  "sl_atr": 1.5,
+  "tp_atr": 2.5,
+  "quiet_minutes": 15,
+  "fee_bps_per_side": 2.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true
+}
