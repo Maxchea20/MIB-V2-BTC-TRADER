@@ -1,6 +1,6 @@
 """20-bar 15m sign, 50-bar 5m break.
 
-later_pullback does not buy the break bar. It waits for a later return to the level.
+split_short_pullback buys longs on the break and waits for shorts.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
     tp_atr = float(cfg.get("tp_atr", 2.5))
     quiet_ms = int(cfg.get("quiet_minutes", 15)) * 60_000
     reverse = cfg.get("exit_mode") == "reverse"
-    later = cfg.get("entry_mode") == "later_pullback"
+    mode = cfg.get("entry_mode", "break")
     wait_bars = int(cfg.get("pullback_wait_bars", 6))
     atr_15 = _atr(bars_15m, period)
 
@@ -51,7 +51,8 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             _skip(skips, "SIGN_MISMATCH")
             continue
 
-        if later:
+        use_later = mode == "later_pullback" or (mode == "split_short_pullback" and side == "SHORT")
+        if use_later:
             found = _later_touch(bars_1m, bars_5m, i, side, level, wait_bars)
             if found is None:
                 _skip(skips, "NO_LATER_PULLBACK")
@@ -84,7 +85,7 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             stop = entry - risk if side == "LONG" else entry + risk
             target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
             trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
-        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "later_pullback" if later else "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
+        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "later_pullback" if use_later else "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
@@ -198,7 +199,7 @@ def _atr(bars, period):
 def _latest_atr(bars, values, now):
     got = None
     for bar, value in zip(bars, values):
-        if bar.close_time > now:
+        if bar[1] > now if False else bar.close_time > now:
             break
         if value:
             got = value
