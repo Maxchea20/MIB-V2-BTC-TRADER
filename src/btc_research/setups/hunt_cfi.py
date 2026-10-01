@@ -1,24 +1,6 @@
 """Hunt C-FI replay for MIB-V2. Does not import the live S1 engine.
 
-Live Hunt this file replays (OBSERVATION_HUNT_M5_C_FI):
-
-  Gate A  C-fast:    15m swing pivot 5, fresh CHoCH, or BOS that is not extended.
-  Gate B  Internal:  15m pivot L/R = 2, same events, must print on the last closed 15m.
-  Gate C  Rearm:     last valid 15m event still in force (no opposite CHoCH,
-                     price has not closed through invalidation).
-
-  Slot 1/2  V2 tap:     5m wick through the thesis level. Fill at that level.
-  Slot 3    impulse_3:  5m close through the prior 15m high/low by >= 0.15 ATR.
-                        Fill at the broken 15m high/low.
-
-  Weather V1b: 4h swing. >= 1.0 ATR retrace off the recent 4h extreme -> CHOP.
-               SWING_UP long only. SWING_DOWN short only. CHOP both.
-  SL 1.5 ATR(15m). TP 2.5 ATR(15m). One position. 15m quiet after exit.
-  No 1m C. No trail. Same-bar rule: stop first.
-
-Run from the repo root:
-
-  py scripts\backtest.py --experiment exp-hunt-cfi-v1
+Thesis uses only events whose timestamp is at or before the last closed 15m bar.
 """
 
 from __future__ import annotations
@@ -62,7 +44,7 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
         if len(closed) < 60:
             _skip(skips, "WARMUP")
             continue
-        thesis = _thesis(fast, internal, closed, parent)
+        thesis = _thesis(fast, internal, closed)
         if thesis is None:
             _skip(skips, "NO_THESIS")
             continue
@@ -99,20 +81,7 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
             continue
 
         trade = _simulate(bars_1m, i1, side, entry, stop, target, risk, cfg)
-        trade.update({
-            "family": "HUNT",
-            "side": side,
-            "decision_time": now,
-            "entry_time": bars_1m[i1].open_time,
-            "reason": path,
-            "gate": thesis["gate"],
-            "event": thesis["event"],
-            "slot": slot,
-            "thesis_level": thesis["level"],
-            "invalidation": thesis["invalid"],
-            "atr_15m": atr_v,
-            "weather": flag,
-        })
+        trade.update({"family": "HUNT", "side": side, "decision_time": now, "entry_time": bars_1m[i1].open_time, "reason": path, "gate": thesis["gate"], "event": thesis["event"], "slot": slot, "thesis_level": thesis["level"], "invalidation": thesis["invalid"], "atr_15m": atr_v, "weather": flag})
         trades.append(trade)
         spent.add((parent, slot))
         next_free = trade["exit_time"] + quiet_ms
@@ -120,15 +89,17 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
     return trades, skips
 
 
-def _thesis(fast, internal, closed, parent):
+def _thesis(fast, internal, closed):
     last_close = closed[-1].close_time
-    fresh_fast = _fresh(fast, last_close)
+    known_fast = [e for e in fast if e["ts"] <= last_close]
+    known_internal = [e for e in internal if e["ts"] <= last_close]
+    fresh_fast = _fresh(known_fast, last_close)
     if fresh_fast is not None:
         return fresh_fast
-    fresh_in = _fresh(internal, last_close)
+    fresh_in = _fresh(known_internal, last_close)
     if fresh_in is not None:
         return fresh_in
-    armed = _rearm(fast, closed) or _rearm(internal, closed)
+    armed = _rearm(known_fast, closed) or _rearm(known_internal, closed)
     if armed is None:
         return None
     armed = dict(armed)
@@ -147,9 +118,6 @@ def _rearm(events, closed):
         return None
     last = events[-1]
     if last["extended"]:
-        return None
-    after = [e for e in events if e["ts"] > last["ts"] and e["event"] == "CHoCH" and e["side"] != last["side"]]
-    if after:
         return None
     for bar in closed:
         if bar.close_time <= last["ts"]:
@@ -204,15 +172,7 @@ def _events(bars, pivot, extended_at):
         else:
             streak += 1
         bias = side
-        out.append({
-            "ts": bar.close_time,
-            "side": side,
-            "event": event,
-            "level": level,
-            "invalid": invalid,
-            "extended": event == "BOS" and streak >= extended_at,
-            "gate": "cfast" if pivot >= 5 else "internal",
-        })
+        out.append({"ts": bar.close_time, "side": side, "event": event, "level": level, "invalid": invalid, "extended": event == "BOS" and streak >= extended_at, "gate": "cfast" if pivot >= 5 else "internal"})
     return out
 
 
@@ -320,24 +280,7 @@ def _simulate(bars, i0, side, entry, stop, target, risk, cfg):
     gross = (exit_px - entry) if side == "LONG" else (entry - exit_px)
     fees = (entry + abs(exit_px)) * float(cfg.get("fee_bps_per_side", 2.0)) / 10_000.0
     net = gross - fees
-    return {
-        "entry": entry,
-        "stop": stop,
-        "target": target,
-        "exit": exit_px,
-        "exit_time": exit_ts,
-        "exit_reason": reason,
-        "gross_pnl": gross,
-        "fees": fees,
-        "slippage_pnl": 0.0,
-        "funding_pnl": 0.0,
-        "net_pnl": net,
-        "r_multiple": net / risk,
-        "mfe_r": mfe,
-        "mae_r": mae,
-        "hold_seconds": max(0, (exit_ts - bars[i0].open_time) // 1000),
-        "notional": entry,
-    }
+    return {"entry": entry, "stop": stop, "target": target, "exit": exit_px, "exit_time": exit_ts, "exit_reason": reason, "gross_pnl": gross, "fees": fees, "slippage_pnl": 0.0, "funding_pnl": 0.0, "net_pnl": net, "r_multiple": net / risk, "mfe_r": mfe, "mae_r": mae, "hold_seconds": max(0, (exit_ts - bars[i0].open_time) // 1000), "notional": entry}
 
 
 def _slip(price, side, cfg, entry):
