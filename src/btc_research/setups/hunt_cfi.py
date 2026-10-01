@@ -1,4 +1,4 @@
-"""Hunt C-FI replay. next_open is the causal default. limit_in_bar fills during the signal bar."""
+"""Hunt C-FI replay. next_open is the causal default. level_after_close reproduces the 55.5% print."""
 
 from __future__ import annotations
 
@@ -70,6 +70,13 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
                 _skip(skips, "NO_LIMIT_TOUCH")
                 continue
             i_fill, raw = hit
+        elif fill_mode == "level_after_close":
+            while i1 < len(bars_1m) and bars_1m[i1].open_time < now:
+                i1 += 1
+            if i1 >= len(bars_1m):
+                _skip(skips, "NO_ENTRY_BAR")
+                continue
+            i_fill, raw = i1, fill_level
         else:
             while i1 < len(bars_1m) and bars_1m[i1].open_time < now:
                 i1 += 1
