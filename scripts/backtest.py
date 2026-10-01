@@ -58,6 +58,7 @@ def main() -> None:
         "exp-hunt-lookback-20-trend",
         "exp-hunt-lookback-20-trend-17",
         "exp-mtf-4h-1h-15m-v1",
+        "exp-mtf-1h-15m-5m-v1",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")
@@ -99,6 +100,10 @@ def main() -> None:
         bars_4h = resample(bars, "4h")
         print(f"resampled 15m={len(bars_15)} 1h={len(bars_1h)} 4h={len(bars_4h)}")
         trades, skips = run_mtf(bars, bars_15, bars_1h, bars_4h, cfg, sides)
+    elif family == "MTF5":
+        bars_1h = resample(bars, "1h")
+        print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)} 1h={len(bars_1h)}")
+        trades, skips = run_mtf(bars, bars_5, bars_15, bars_1h, cfg, sides)
     else:
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
         trades, skips = run_s2(bars, bars_5, bars_15, cfg, sides)
