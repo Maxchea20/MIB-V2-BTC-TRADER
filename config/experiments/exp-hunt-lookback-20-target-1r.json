@@ -1,0 +1,23 @@
+{
+  "experiment_id": "exp-hunt-lookback-20-target-1r",
+  "family": "HUNT20",
+  "description": "Same 20-bar entry and pullback tap. Stop stays 1.5 ATR. Target is 1.5 ATR, which is 1R, because the median favorable move was 1.35R long and 1.52R short.",
+  "symbol": "BTC_USDT",
+  "sides": ["LONG", "SHORT"],
+  "lookback_15": 20,
+  "lookback_5": 50,
+  "atr_period": 14,
+  "sl_atr": 1.5,
+  "tp_atr": 1.5,
+  "exit_mode": "fixed",
+  "quiet_minutes": 15,
+  "fee_bps_per_side": 2.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true
+}
