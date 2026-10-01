@@ -1,0 +1,21 @@
+{
+  "experiment_id": "exp-s4-structure-v1",
+  "family": "S4",
+  "description": "15m rejection back through a confirmed range edge, target the midpoint, stop beyond the rejection plus 0.15 ATR. No indicators.",
+  "symbol": "BTC_USDT",
+  "sides": ["LONG", "SHORT"],
+  "pivot_left": 3,
+  "pivot_right": 3,
+  "atr_period": 14,
+  "atr_buffer": 0.15,
+  "min_stop_bps": 25,
+  "fee_bps_per_side": 4.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true
+}
