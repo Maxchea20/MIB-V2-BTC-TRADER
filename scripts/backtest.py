@@ -23,6 +23,7 @@ from btc_research.setups.s2_sweep import run_s2
 from btc_research.setups.s3_retest import run_s3
 from btc_research.setups.s4_range import run_s4
 from btc_research.setups.w1_swing import run_w1
+from btc_research.setups.hunt_cfi import run_hunt
 
 
 def main() -> None:
@@ -34,9 +35,18 @@ def main() -> None:
     parser.add_argument("--end", default=None)
     args = parser.parse_args()
     cfg = experiment_config(args.experiment)
-    allowed = {"exp-s1-structure-v1", "exp-s1-exit-075-120", "exp-s1-target-1r", "exp-s2-structure-v1", "exp-s3-structure-v1", "exp-s4-structure-v1", "exp-w1-structure-v1"}
+    allowed = {
+        "exp-s1-structure-v1",
+        "exp-s1-exit-075-120",
+        "exp-s1-target-1r",
+        "exp-s2-structure-v1",
+        "exp-s3-structure-v1",
+        "exp-s4-structure-v1",
+        "exp-w1-structure-v1",
+        "exp-hunt-cfi-v1",
+    }
     if args.experiment not in allowed:
-        raise SystemExit("Implemented experiments: S1, S1 exit 0.75/1.2, S1 target 1R, S2, S3, S4, W1.")
+        raise SystemExit("Implemented experiments: S1, S1 exit 0.75/1.2, S1 target 1R, S2, S3, S4, W1, Hunt C-FI.")
     db = research_db_path(args.db)
     start = _ms(args.start or cfg.get("start"))
     end = _ms(args.end or cfg.get("end"))
@@ -63,6 +73,10 @@ def main() -> None:
         bars_1d = resample(bars, "1d")
         print(f"resampled 15m={len(bars_15)} 1h={len(bars_1h)} 4h={len(bars_4h)} 1d={len(bars_1d)}")
         trades, skips = run_w1(bars, bars_15, bars_1h, bars_4h, bars_1d, cfg, sides)
+    elif family == "HUNT":
+        bars_4h = resample(bars, "4h")
+        print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)} 4h={len(bars_4h)}")
+        trades, skips = run_hunt(bars, bars_5, bars_15, bars_4h, cfg, sides)
     else:
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
         trades, skips = run_s2(bars, bars_5, bars_15, cfg, sides)
