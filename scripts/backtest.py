@@ -44,9 +44,10 @@ def main() -> None:
         "exp-s4-structure-v1",
         "exp-w1-structure-v1",
         "exp-hunt-cfi-v1",
+        "exp-hunt-cfi-limit-v1",
     }
     if args.experiment not in allowed:
-        raise SystemExit("Implemented experiments: S1, S1 exit 0.75/1.2, S1 target 1R, S2, S3, S4, W1, Hunt C-FI.")
+        raise SystemExit("Implemented experiments: S1 family, S2, S3, S4, W1, Hunt C-FI, Hunt limit fill.")
     db = research_db_path(args.db)
     start = _ms(args.start or cfg.get("start"))
     end = _ms(args.end or cfg.get("end"))
