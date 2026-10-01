@@ -1,0 +1,2 @@
+# No third-party packages required for audit or exp-s1-structure-v1.
+# Python 3.11+ recommended. 3.10 works.

@@ -1,0 +1,11 @@
+{
+  "research_db": "backend/research_binance.db",
+  "live_db": "backend/market_data_clean.db",
+  "symbol": "BTCUSDT",
+  "results_dir": "results",
+  "tick_size": 0.1,
+  "fee_bps_per_side": 4.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "notes": "Paths are relative to the repo root. RESEARCH_DB_PATH and LIVE_DB_PATH override them. tick_size is the Binance USD-M BTCUSDT default of 0.1 and is an execution assumption, not a MEXC contract read."
+}

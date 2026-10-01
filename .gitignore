@@ -1,0 +1,9 @@
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+results/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.log
