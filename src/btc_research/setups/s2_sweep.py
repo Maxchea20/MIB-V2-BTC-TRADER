@@ -1,9 +1,8 @@
-"""S2 liquidity sweep and reclaim. Structure only. Cost floor is pre-registered from the S1 stop-width result."""
+"""S2 liquidity sweep and reclaim. Structure only. No private imports from S1."""
 
 from __future__ import annotations
 
 from btc_research.features import atr
-from btc_research.setups.s1_pullback import _last_closed_index, _simulate, _slip
 from btc_research.structure import swing_points
 
 
@@ -67,10 +66,76 @@ def _swept_level(bar, highs, lows, i15):
 
 
 def _reclaimed(side, bars_5m, now, pool):
-    idx = _last_closed_index(bars_5m, now)
+    idx = _last(bars_5m, now)
     if idx < 0:
         return False
     return bars_5m[idx].close > pool if side == "LONG" else bars_5m[idx].close < pool
+
+
+def _last(bars, now):
+    lo, hi, ans = 0, len(bars) - 1, -1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if bars[mid].close_time <= now:
+            ans = mid
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return ans
+
+
+def _slip(price, side, cfg, is_entry):
+    tick = float(cfg["tick_size"]) * int(cfg["slippage_ticks"])
+    bps = float(cfg["slippage_bps"]) / 10_000.0
+    worse_up = side == "LONG" if is_entry else side == "SHORT"
+    return price * (1 + bps) + tick if worse_up else price * (1 - bps) - tick
+
+
+def _simulate(bars, entry_index, side, fill, stop, target, cfg):
+    fee_rate = float(cfg["fee_bps_per_side"]) / 10_000.0
+    mfe = mae = 0.0
+    risk = abs(fill - stop)
+    exit_price, exit_time, reason = fill, bars[entry_index].close_time, "END_OF_DATA"
+    for bar in bars[entry_index:]:
+        if side == "LONG":
+            mfe = max(mfe, (bar.high - fill) / risk)
+            mae = min(mae, (bar.low - fill) / risk)
+            hit_stop, hit_target = bar.low <= stop, bar.high >= target
+        else:
+            mfe = max(mfe, (fill - bar.low) / risk)
+            mae = min(mae, (fill - bar.high) / risk)
+            hit_stop, hit_target = bar.high >= stop, bar.low <= target
+        if hit_stop:
+            exit_price = _slip(stop, side, cfg, False)
+            exit_time = bar.close_time
+            reason = "STOP_SAME_BAR" if hit_target else "STOP"
+            break
+        if hit_target:
+            exit_price = _slip(target, side, cfg, False)
+            exit_time = bar.close_time
+            reason = "TARGET"
+            break
+        exit_price, exit_time = bar.close, bar.close_time
+    gross = (exit_price - fill) if side == "LONG" else (fill - exit_price)
+    fees = fee_rate * fill + fee_rate * abs(exit_price)
+    return {
+        "entry": fill,
+        "stop": stop,
+        "target": target,
+        "exit": exit_price,
+        "exit_time": exit_time,
+        "exit_reason": reason,
+        "gross_pnl": gross,
+        "fees": fees,
+        "slippage_pnl": 0.0,
+        "funding_pnl": 0.0,
+        "net_pnl": gross - fees,
+        "r_multiple": (gross - fees) / risk if risk else 0.0,
+        "mfe_r": mfe,
+        "mae_r": mae,
+        "hold_seconds": max(0, (exit_time - bars[entry_index].open_time) / 1000),
+        "notional": fill,
+    }
 
 
 def _skip(skips, key):
