@@ -1,4 +1,4 @@
-"""Hunt C-FI replay. Fill is the next 1m open, and only if that open is still through the level."""
+"""Hunt C-FI replay. next_open is the causal default. limit_in_bar fills during the signal bar."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
     retrace_atr = float(cfg.get("weather_retrace_atr", 1.0))
     quiet_ms = int(cfg.get("quiet_minutes", 15)) * 60_000
     extended_at = int(cfg.get("extended_bos", 3))
+    fill_mode = cfg.get("fill_mode", "next_open")
 
     atr_15 = _atr(bars_15m, period)
     fast = _events(bars_15m, pivot_fast, extended_at)
@@ -63,20 +64,28 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
             _skip(skips, "NO_ANSWER")
             continue
 
-        while i1 < len(bars_1m) and bars_1m[i1].open_time < now:
-            i1 += 1
-        if i1 >= len(bars_1m):
-            _skip(skips, "NO_ENTRY_BAR")
-            continue
-        open_px = bars_1m[i1].open
-        if side == "LONG" and open_px < fill_level:
-            _skip(skips, "OPEN_NOT_THROUGH")
-            continue
-        if side == "SHORT" and open_px > fill_level:
-            _skip(skips, "OPEN_NOT_THROUGH")
-            continue
+        if fill_mode == "limit_in_bar":
+            hit = _limit_fill(bars_1m, bar.open_time, now, side, fill_level)
+            if hit is None:
+                _skip(skips, "NO_LIMIT_TOUCH")
+                continue
+            i_fill, raw = hit
+        else:
+            while i1 < len(bars_1m) and bars_1m[i1].open_time < now:
+                i1 += 1
+            if i1 >= len(bars_1m):
+                _skip(skips, "NO_ENTRY_BAR")
+                continue
+            open_px = bars_1m[i1].open
+            if side == "LONG" and open_px < fill_level:
+                _skip(skips, "OPEN_NOT_THROUGH")
+                continue
+            if side == "SHORT" and open_px > fill_level:
+                _skip(skips, "OPEN_NOT_THROUGH")
+                continue
+            i_fill, raw = i1, open_px
 
-        entry = _slip(open_px, side, cfg, True)
+        entry = _slip(raw, side, cfg, True)
         stop = entry - sl_atr * atr_v if side == "LONG" else entry + sl_atr * atr_v
         target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
         risk = abs(entry - stop)
@@ -84,13 +93,26 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
             _skip(skips, "INVALID_STOP")
             continue
 
-        trade = _simulate(bars_1m, i1, side, entry, stop, target, risk, cfg)
-        trade.update({"family": "HUNT", "side": side, "decision_time": now, "entry_time": bars_1m[i1].open_time, "reason": path, "gate": thesis["gate"], "event": thesis["event"], "slot": slot, "thesis_level": thesis["level"], "invalidation": thesis["invalid"], "atr_15m": atr_v, "weather": flag})
+        trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
+        trade.update({"family": "HUNT", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": path, "gate": thesis["gate"], "event": thesis["event"], "slot": slot, "thesis_level": thesis["level"], "invalidation": thesis["invalid"], "atr_15m": atr_v, "weather": flag})
         trades.append(trade)
         spent.add((parent, slot))
         next_free = trade["exit_time"] + quiet_ms
 
     return trades, skips
+
+
+def _limit_fill(bars, start, end, side, level):
+    for i, bar in enumerate(bars):
+        if bar.open_time < start:
+            continue
+        if bar.open_time >= end:
+            return None
+        if side == "LONG" and (bar.open >= level or bar.high >= level):
+            return i, bar.open if bar.open >= level else level
+        if side == "SHORT" and (bar.open <= level or bar.low <= level):
+            return i, bar.open if bar.open <= level else level
+    return None
 
 
 def _thesis(fast, internal, closed):
