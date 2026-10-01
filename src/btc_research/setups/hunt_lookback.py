@@ -1,6 +1,6 @@
 """20-bar 15m sign, 50-bar 5m break.
 
-split_short_pullback buys longs on the break and waits for shorts.
+engulf_5m requires the break bar to engulf the prior 5m body.
 """
 
 from __future__ import annotations
@@ -52,7 +52,22 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             continue
 
         use_later = mode == "later_pullback" or (mode == "split_short_pullback" and side == "SHORT")
-        if use_later:
+        if mode == "engulf_5m":
+            if i == 0 or not _engulf(bars_5m[i - 1], bar, side):
+                _skip(skips, "NO_ENGULF")
+                continue
+            nxt = _next_open(bars_1m, now)
+            if nxt is None:
+                _skip(skips, "NO_ENTRY_BAR")
+                continue
+            i_fill, raw = nxt
+            if side == "LONG" and raw < level:
+                _skip(skips, "OPEN_NOT_THROUGH")
+                continue
+            if side == "SHORT" and raw > level:
+                _skip(skips, "OPEN_NOT_THROUGH")
+                continue
+        elif use_later:
             found = _later_touch(bars_1m, bars_5m, i, side, level, wait_bars)
             if found is None:
                 _skip(skips, "NO_LATER_PULLBACK")
@@ -85,10 +100,16 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             stop = entry - risk if side == "LONG" else entry + risk
             target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
             trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
-        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "later_pullback" if use_later else "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
+        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "engulf_5m" if mode == "engulf_5m" else ("later_pullback" if use_later else "pullback_tap"), "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
+
+
+def _engulf(prior, bar, side):
+    if side == "LONG":
+        return bar.close > bar.open and prior.close < prior.open and bar.open <= prior.close and bar.close >= prior.open
+    return bar.close < bar.open and prior.close > prior.open and bar.open >= prior.close and bar.close <= prior.open
 
 
 def _later_touch(bars_1m, bars_5m, i_signal, side, level, wait_bars):
@@ -199,7 +220,7 @@ def _atr(bars, period):
 def _latest_atr(bars, values, now):
     got = None
     for bar, value in zip(bars, values):
-        if bar[1] > now if False else bar.close_time > now:
+        if bar.close_time > now:
             break
         if value:
             got = value
