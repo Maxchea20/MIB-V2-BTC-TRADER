@@ -1,7 +1,7 @@
 {
   "research_db": "backend/research_binance.db",
   "live_db": "backend/market_data_clean.db",
-  "symbol": "BTCUSDT",
+  "symbol": "BTC_USDT",
   "results_dir": "results",
   "tick_size": 0.1,
   "fee_bps_per_side": 4.0,

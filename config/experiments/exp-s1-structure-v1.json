@@ -2,7 +2,7 @@
   "experiment_id": "exp-s1-structure-v1",
   "family": "S1",
   "description": "Structure-only 1H bias, 15M pullback hold, 5M reclaim, next 1M open. No volume, RSI, MACD, or bands.",
-  "symbol": "BTCUSDT",
+  "symbol": "BTC_USDT",
   "sides": ["LONG", "SHORT"],
   "pivot_left": 3,
   "pivot_right": 3,
