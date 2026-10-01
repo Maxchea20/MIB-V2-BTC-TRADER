@@ -25,6 +25,7 @@ from btc_research.setups.s4_range import run_s4
 from btc_research.setups.w1_swing import run_w1
 from btc_research.setups.hunt_cfi import run_hunt
 from btc_research.setups.hunt_lookback import run_hunt20
+from btc_research.setups.mtf_stack import run_mtf
 
 
 def main() -> None:
@@ -56,6 +57,7 @@ def main() -> None:
         "exp-hunt-lookback-20-engulf-5m",
         "exp-hunt-lookback-20-trend",
         "exp-hunt-lookback-20-trend-17",
+        "exp-mtf-4h-1h-15m-v1",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")
@@ -92,6 +94,11 @@ def main() -> None:
     elif family == "HUNT20":
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
         trades, skips = run_hunt20(bars, bars_5, bars_15, cfg, sides)
+    elif family == "MTF":
+        bars_1h = resample(bars, "1h")
+        bars_4h = resample(bars, "4h")
+        print(f"resampled 15m={len(bars_15)} 1h={len(bars_1h)} 4h={len(bars_4h)}")
+        trades, skips = run_mtf(bars, bars_15, bars_1h, bars_4h, cfg, sides)
     else:
         print(f"resampled 5m={len(bars_5)} 15m={len(bars_15)}")
         trades, skips = run_s2(bars, bars_5, bars_15, cfg, sides)
