@@ -1,7 +1,4 @@
-"""Hunt C-FI replay for MIB-V2. Does not import the live S1 engine.
-
-Thesis uses only events whose timestamp is at or before the last closed 15m bar.
-"""
+"""Hunt C-FI replay. Fill is the next 1m open, and only if that open is still through the level."""
 
 from __future__ import annotations
 
@@ -71,8 +68,15 @@ def run_hunt(bars_1m, bars_5m, bars_15m, bars_4h, cfg, sides):
         if i1 >= len(bars_1m):
             _skip(skips, "NO_ENTRY_BAR")
             continue
+        open_px = bars_1m[i1].open
+        if side == "LONG" and open_px < fill_level:
+            _skip(skips, "OPEN_NOT_THROUGH")
+            continue
+        if side == "SHORT" and open_px > fill_level:
+            _skip(skips, "OPEN_NOT_THROUGH")
+            continue
 
-        entry = _slip(fill_level, side, cfg, True)
+        entry = _slip(open_px, side, cfg, True)
         stop = entry - sl_atr * atr_v if side == "LONG" else entry + sl_atr * atr_v
         target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
         risk = abs(entry - stop)
