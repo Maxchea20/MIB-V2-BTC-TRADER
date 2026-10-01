@@ -1,0 +1,23 @@
+{
+  "experiment_id": "exp-hunt-lookback-20-ratio-05-12",
+  "family": "HUNT20",
+  "description": "Same 20-bar entry. The 1:1 run used 1.5 ATR for both. This uses 0.5 and 1.2 of that distance: stop 0.75 ATR, target 1.8 ATR.",
+  "symbol": "BTC_USDT",
+  "sides": ["LONG", "SHORT"],
+  "lookback_15": 20,
+  "lookback_5": 50,
+  "atr_period": 14,
+  "sl_atr": 0.75,
+  "tp_atr": 1.8,
+  "exit_mode": "fixed",
+  "quiet_minutes": 15,
+  "fee_bps_per_side": 2.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true
+}
