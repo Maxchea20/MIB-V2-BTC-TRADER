@@ -53,6 +53,7 @@ def main() -> None:
         "exp-hunt-lookback-20-ratio-05-12",
         "exp-hunt-lookback-20-later-pullback",
         "exp-hunt-lookback-20-split-entry",
+        "exp-hunt-lookback-20-engulf-5m",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")
