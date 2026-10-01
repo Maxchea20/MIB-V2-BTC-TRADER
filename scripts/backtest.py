@@ -49,6 +49,7 @@ def main() -> None:
         "exp-hunt-cfi-level-v1",
         "exp-hunt-lookback-20-v1",
         "exp-hunt-lookback-20-reverse-v1",
+        "exp-hunt-lookback-20-target-1r",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")
