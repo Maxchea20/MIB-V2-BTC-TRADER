@@ -12,7 +12,7 @@
   "extension_cap_atr": 1.5,
   "extension_atr_timeframe": "1h",
   "too_late_r": 0.6,
-  "fee_bps_per_side": 4.0,
+  "fee_bps_per_side": 2.0,
   "slippage_ticks": 1,
   "slippage_bps": 0.5,
   "tick_size": 0.1,
