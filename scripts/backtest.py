@@ -55,6 +55,7 @@ def main() -> None:
         "exp-hunt-lookback-20-split-entry",
         "exp-hunt-lookback-20-engulf-5m",
         "exp-hunt-lookback-20-trend",
+        "exp-hunt-lookback-20-trend-17",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")
