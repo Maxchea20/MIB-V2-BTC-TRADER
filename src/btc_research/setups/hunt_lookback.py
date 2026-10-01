@@ -1,6 +1,6 @@
 """20-bar 15m sign, 50-bar 5m break.
 
-trend_filter skips longs in a down close and shorts in an up close.
+mtf_filter requires the 4h close trend and a 1h break in the same direction.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
     wait_bars = int(cfg.get("pullback_wait_bars", 6))
     trend_on = bool(cfg.get("trend_filter", False))
     trend_bars = int(cfg.get("trend_days", 20)) * 96
+    mtf = bool(cfg.get("mtf_filter", False))
     atr_15 = _atr(bars_15m, period)
 
     skips, trades = {}, []
@@ -59,6 +60,14 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
         if trend == "UP" and side == "SHORT":
             _skip(skips, "TREND_UP")
             continue
+        if mtf:
+            h4 = _trend(cfg.get("_bars_4h") or [], now, int(cfg.get("trend_4h_bars", 30)))
+            h1 = _sign(cfg.get("_bars_1h") or [], now, int(cfg.get("lookback_1h", 20)))
+            h4_side = {"UP": "LONG", "DOWN": "SHORT"}.get(h4)
+            if h4_side != side or h1 != side:
+                _skip(skips, "MTF_MISMATCH")
+                continue
+            trend = h4
 
         use_later = mode == "later_pullback" or (mode == "split_short_pullback" and side == "SHORT")
         if mode == "engulf_5m":
@@ -109,7 +118,7 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             stop = entry - risk if side == "LONG" else entry + risk
             target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
             trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
-        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "engulf_5m" if mode == "engulf_5m" else ("later_pullback" if use_later else "pullback_tap"), "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": trend})
+        trade.update({"family": "HUNTMTF" if mtf else "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "engulf_5m" if mode == "engulf_5m" else ("later_pullback" if use_later else "pullback_tap"), "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": trend})
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
