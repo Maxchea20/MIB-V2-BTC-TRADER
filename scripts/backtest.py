@@ -34,9 +34,9 @@ def main() -> None:
     parser.add_argument("--end", default=None)
     args = parser.parse_args()
     cfg = experiment_config(args.experiment)
-    allowed = {"exp-s1-structure-v1", "exp-s2-structure-v1", "exp-s3-structure-v1", "exp-s4-structure-v1", "exp-w1-structure-v1"}
+    allowed = {"exp-s1-structure-v1", "exp-s1-exit-075-120", "exp-s2-structure-v1", "exp-s3-structure-v1", "exp-s4-structure-v1", "exp-w1-structure-v1"}
     if args.experiment not in allowed:
-        raise SystemExit("Implemented experiments: S1, S2, S3, S4, W1.")
+        raise SystemExit("Implemented experiments: S1, S1 exit 0.75/1.2, S2, S3, S4, W1.")
     db = research_db_path(args.db)
     start = _ms(args.start or cfg.get("start"))
     end = _ms(args.end or cfg.get("end"))
