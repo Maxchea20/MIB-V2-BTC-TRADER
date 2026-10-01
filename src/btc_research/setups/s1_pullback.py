@@ -14,6 +14,7 @@ def run_s1(bars_1m, bars_5m, bars_15m, bars_1h, cfg, sides):
     atr_1h = atr([b.high for b in bars_1h], [b.low for b in bars_1h], [b.close for b in bars_1h], period)
     atr_15 = atr([b.high for b in bars_15m], [b.low for b in bars_15m], [b.close for b in bars_15m], period)
     skips, trades, next_free, i1 = {}, [], 0, 0
+    stop_scale = float(cfg.get("stop_scale", 1.0))
     for i5, bar in enumerate(bars_5m):
         now = bar.close_time
         if now < next_free:
@@ -38,14 +39,14 @@ def run_s1(bars_1m, bars_5m, bars_15m, bars_1h, cfg, sides):
         if extension > float(cfg["extension_cap_atr"]):
             _skip(skips, "EXTENSION")
             continue
-        stop = setup["invalidation"] - float(cfg["atr_buffer"]) * atr_m if side == "LONG" else setup["invalidation"] + float(cfg["atr_buffer"]) * atr_m
+        structure_stop = setup["invalidation"] - float(cfg["atr_buffer"]) * atr_m if side == "LONG" else setup["invalidation"] + float(cfg["atr_buffer"]) * atr_m
         while i1 < len(bars_1m) and bars_1m[i1].open_time < now:
             i1 += 1
         if i1 >= len(bars_1m):
             _skip(skips, "NO_ENTRY_BAR")
             continue
         entry_bar = bars_1m[i1]
-        risk = (bar.close - stop) if side == "LONG" else (stop - bar.close)
+        risk = (bar.close - structure_stop) if side == "LONG" else (structure_stop - bar.close)
         if risk <= 0:
             _skip(skips, "INVALID_STOP")
             continue
@@ -54,10 +55,11 @@ def run_s1(bars_1m, bars_5m, bars_15m, bars_1h, cfg, sides):
             _skip(skips, "TOO_LATE")
             continue
         fill = _slip(entry_bar.open, side, cfg, True)
-        risk_fill = (fill - stop) if side == "LONG" else (stop - fill)
+        risk_fill = (fill - structure_stop) if side == "LONG" else (structure_stop - fill)
         if risk_fill <= 0:
             _skip(skips, "INVALID_STOP_AFTER_SLIPPAGE")
             continue
+        stop = fill - stop_scale * risk_fill if side == "LONG" else fill + stop_scale * risk_fill
         target = fill + float(cfg["target_r"]) * risk_fill if side == "LONG" else fill - float(cfg["target_r"]) * risk_fill
         trade = _simulate(bars_1m, i1, side, fill, stop, target, cfg)
         trade.update({"family": "S1", "side": side, "decision_time": now, "entry_time": entry_bar.open_time, "extension_atr": extension, "atr_1h": atr_h, "atr_15m": atr_m, "invalidation": setup["invalidation"], "reason": "S1_5M_RECLAIM"})
