@@ -1,6 +1,6 @@
 """20-bar 15m sign, 50-bar 5m break, pullback tap, no rearm.
 
-Fill is the first 1m bar inside the signal 5m bar that trades through the level.
+exit_mode reverse closes on the opposite 5m break. There is no fixed stop or target.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
     sl_atr = float(cfg.get("sl_atr", 1.5))
     tp_atr = float(cfg.get("tp_atr", 2.5))
     quiet_ms = int(cfg.get("quiet_minutes", 15)) * 60_000
+    reverse = cfg.get("exit_mode") == "reverse"
     atr_15 = _atr(bars_15m, period)
 
     skips, trades = {}, []
@@ -61,17 +62,68 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             _skip(skips, "ATR_NOT_READY")
             continue
         entry = _slip(raw, side, cfg, True)
-        stop = entry - sl_atr * atr_v if side == "LONG" else entry + sl_atr * atr_v
-        target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
-        risk = abs(entry - stop)
+        risk = sl_atr * atr_v
         if risk <= 0:
             _skip(skips, "INVALID_STOP")
             continue
-        trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
+        if reverse:
+            trade = _to_reverse(bars_1m, bars_5m, i, i_fill, side, entry, risk, lookback_5, cfg)
+        else:
+            stop = entry - risk if side == "LONG" else entry + risk
+            target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
+            trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
         trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
+
+
+def _to_reverse(bars_1m, bars_5m, i_signal, i_fill, side, entry, risk, lookback, cfg):
+    exit_i = None
+    exit_raw = None
+    reason = "END_OF_DATA"
+    for j in range(i_signal + 1, len(bars_5m)):
+        bar = bars_5m[j]
+        if j < lookback:
+            continue
+        window = bars_5m[j - lookback:j]
+        flipped = side == "LONG" and bar.close < min(b.low for b in window)
+        flipped = flipped or (side == "SHORT" and bar.close > max(b.high for b in window))
+        if not flipped:
+            continue
+        nxt = _next_open(bars_1m, bar.close_time)
+        if nxt is None:
+            break
+        exit_i, exit_raw = nxt
+        reason = "REVERSE"
+        break
+    if exit_raw is None:
+        exit_i = len(bars_1m) - 1
+        exit_raw = bars_1m[-1].close
+    return _hold(bars_1m, i_fill, exit_i, side, entry, exit_raw, risk, reason, cfg)
+
+
+def _next_open(bars, after):
+    for i, bar in enumerate(bars):
+        if bar.open_time >= after:
+            return i, bar.open
+    return None
+
+
+def _hold(bars, i0, i_exit, side, entry, exit_raw, risk, reason, cfg):
+    mfe = mae = 0.0
+    last = min(i_exit, len(bars) - 1)
+    for bar in bars[i0:last + 1]:
+        favorable = (bar.high - entry) if side == "LONG" else (entry - bar.low)
+        adverse = (entry - bar.low) if side == "LONG" else (bar.high - entry)
+        mfe = max(mfe, favorable / risk)
+        mae = max(mae, adverse / risk)
+    exit_px = _slip(exit_raw, side, cfg, False)
+    gross = (exit_px - entry) if side == "LONG" else (entry - exit_px)
+    fees = (entry + abs(exit_px)) * float(cfg.get("fee_bps_per_side", 2.0)) / 10_000.0
+    net = gross - fees
+    ref = entry - risk if side == "LONG" else entry + risk
+    return {"entry": entry, "stop": ref, "target": entry, "exit": exit_px, "exit_time": bars[last].close_time, "exit_reason": reason, "gross_pnl": gross, "fees": fees, "slippage_pnl": 0.0, "funding_pnl": 0.0, "net_pnl": net, "r_multiple": net / risk, "mfe_r": mfe, "mae_r": mae, "hold_seconds": max(0, (bars[last].close_time - bars[i0].open_time) // 1000), "notional": entry}
 
 
 def _sign(bars, now, lookback):
