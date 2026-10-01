@@ -1,6 +1,6 @@
-"""20-bar 15m sign, 50-bar 5m break, pullback tap, no rearm.
+"""20-bar 15m sign, 50-bar 5m break.
 
-exit_mode reverse closes on the opposite 5m break. There is no fixed stop or target.
+later_pullback does not buy the break bar. It waits for a later return to the level.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
     tp_atr = float(cfg.get("tp_atr", 2.5))
     quiet_ms = int(cfg.get("quiet_minutes", 15)) * 60_000
     reverse = cfg.get("exit_mode") == "reverse"
+    later = cfg.get("entry_mode") == "later_pullback"
+    wait_bars = int(cfg.get("pullback_wait_bars", 6))
     atr_15 = _atr(bars_15m, period)
 
     skips, trades = {}, []
@@ -48,15 +50,25 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
         if sign != side:
             _skip(skips, "SIGN_MISMATCH")
             continue
-        tapped = bar.low <= level <= bar.close if side == "LONG" else bar.close <= level <= bar.high
-        if not tapped:
-            _skip(skips, "NO_PULLBACK_TAP")
-            continue
-        hit = _touch(bars_1m, bar.open_time, now, side, level)
-        if hit is None:
-            _skip(skips, "NO_LIMIT_TOUCH")
-            continue
-        i_fill, raw = hit
+
+        if later:
+            found = _later_touch(bars_1m, bars_5m, i, side, level, wait_bars)
+            if found is None:
+                _skip(skips, "NO_LATER_PULLBACK")
+                continue
+            fill_bar, i_fill, raw = found
+            now = fill_bar.close_time
+        else:
+            tapped = bar.low <= level <= bar.close if side == "LONG" else bar.close <= level <= bar.high
+            if not tapped:
+                _skip(skips, "NO_PULLBACK_TAP")
+                continue
+            hit = _touch(bars_1m, bar.open_time, now, side, level)
+            if hit is None:
+                _skip(skips, "NO_LIMIT_TOUCH")
+                continue
+            i_fill, raw = hit
+
         atr_v = _latest_atr(bars_15m, atr_15, now)
         if not atr_v:
             _skip(skips, "ATR_NOT_READY")
@@ -72,10 +84,24 @@ def run_hunt20(bars_1m, bars_5m, bars_15m, cfg, sides):
             stop = entry - risk if side == "LONG" else entry + risk
             target = entry + tp_atr * atr_v if side == "LONG" else entry - tp_atr * atr_v
             trade = _simulate(bars_1m, i_fill, side, entry, stop, target, risk, cfg)
-        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
+        trade.update({"family": "HUNT20", "side": side, "decision_time": now, "entry_time": bars_1m[i_fill].open_time, "reason": "later_pullback" if later else "pullback_tap", "gate": "fresh", "event": event, "slot": ((bar.open_time % 900_000) // 300_000) + 1, "thesis_level": level, "invalidation": prior_low if side == "LONG" else prior_high, "atr_15m": atr_v, "weather": "NONE"})
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
+
+
+def _later_touch(bars_1m, bars_5m, i_signal, side, level, wait_bars):
+    last = min(len(bars_5m), i_signal + 1 + wait_bars)
+    for j in range(i_signal + 1, last):
+        bar = bars_5m[j]
+        came_back = bar.low <= level if side == "LONG" else bar.high >= level
+        if not came_back:
+            continue
+        hit = _touch(bars_1m, bar.open_time, bar.close_time, side, level)
+        if hit is None:
+            continue
+        return bar, hit[0], hit[1]
+    return None
 
 
 def _to_reverse(bars_1m, bars_5m, i_signal, i_fill, side, entry, risk, lookback, cfg):
