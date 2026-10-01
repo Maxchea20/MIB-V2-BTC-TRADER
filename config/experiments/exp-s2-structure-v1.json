@@ -1,0 +1,23 @@
+{
+  "experiment_id": "exp-s2-structure-v1",
+  "family": "S2",
+  "description": "15m sweep of a confirmed swing, close back through the level, 5m reclaim, next 1m open. Minimum 25 bp stop from the S1 cost result. No indicators.",
+  "symbol": "BTC_USDT",
+  "sides": ["LONG", "SHORT"],
+  "pivot_left": 3,
+  "pivot_right": 3,
+  "atr_period": 14,
+  "atr_buffer": 0.15,
+  "target_r": 1.5,
+  "too_late_r": 0.6,
+  "min_stop_bps": 25,
+  "fee_bps_per_side": 4.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true
+}
