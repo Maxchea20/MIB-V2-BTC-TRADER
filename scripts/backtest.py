@@ -48,9 +48,10 @@ def main() -> None:
         "exp-hunt-cfi-limit-v1",
         "exp-hunt-cfi-level-v1",
         "exp-hunt-lookback-20-v1",
+        "exp-hunt-lookback-20-reverse-v1",
     }
     if args.experiment not in allowed:
-        raise SystemExit("Implemented experiments include Hunt level fill and Hunt 20-bar lookback.")
+        raise SystemExit("Unknown experiment.")
     db = research_db_path(args.db)
     start = _ms(args.start or cfg.get("start"))
     end = _ms(args.end or cfg.get("end"))
