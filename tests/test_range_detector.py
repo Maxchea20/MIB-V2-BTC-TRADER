@@ -1,6 +1,10 @@
 """Range detector cases. No orders."""
 
+import sys
 import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from btc_research.market_structure.range_detector import detect_range, react
 
