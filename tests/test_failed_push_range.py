@@ -59,7 +59,7 @@ class FailedPushRangeTest(unittest.TestCase):
         self.assertAlmostEqual(state.low, 100)
 
     def test_second_solid_close_confirms_the_break(self):
-        rows = box() + [b(105, 109, 104.5, 108.5), b(108.5, 110, 107.5, 109.5)]
+        rows = box() + [b(105, 109, 104.5, 108.5), b(108, 110, 107.8, 109.6)]
         state = detect_push_range(rows)
         self.assertEqual(state.phase, "BREAKOUT_CONFIRMED")
         self.assertFalse(state.active)
