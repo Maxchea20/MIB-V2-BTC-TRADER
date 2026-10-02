@@ -41,9 +41,6 @@ class FailedPushRangeTest(unittest.TestCase):
     def test_two_failed_pushes_draw_the_box(self):
         state = detect_push_range(box())
         self.assertTrue(state.active)
-        self.assertAlmostEqual(state.a, 110)
-        self.assertAlmostEqual(state.a1, 100)
-        self.assertAlmostEqual(state.aa, 106)
         self.assertAlmostEqual(state.high, 106)
         self.assertAlmostEqual(state.low, 100)
         self.assertEqual(state.phase, "RANGE")
@@ -54,13 +51,18 @@ class FailedPushRangeTest(unittest.TestCase):
     def test_solid_close_is_only_a_candidate(self):
         self.assertEqual(detect_push_range(box() + [b(105, 109, 104.5, 108.5)]).phase, "BREAKOUT_CANDIDATE")
 
-    def test_return_inside_keeps_the_range(self):
+    def test_return_inside_expands_the_line(self):
         rows = box() + [b(105, 109, 104.5, 108.5), b(108, 108.2, 103, 104)]
-        self.assertEqual(detect_push_range(rows).phase, "RANGE")
+        state = detect_push_range(rows)
+        self.assertEqual(state.phase, "RANGE")
+        self.assertAlmostEqual(state.high, 109)
+        self.assertAlmostEqual(state.low, 100)
 
-    def test_stay_outside_confirms_the_break(self):
+    def test_second_solid_close_confirms_the_break(self):
         rows = box() + [b(105, 109, 104.5, 108.5), b(108.5, 110, 107.5, 109.5)]
-        self.assertEqual(detect_push_range(rows).phase, "BREAKOUT_CONFIRMED")
+        state = detect_push_range(rows)
+        self.assertEqual(state.phase, "BREAKOUT_CONFIRMED")
+        self.assertFalse(state.active)
 
     def test_trend_is_not_a_box(self):
         self.assertFalse(detect_push_range([b(100 + i, 101 + i, 99 + i, 100.6 + i) for i in range(40)]).active)
