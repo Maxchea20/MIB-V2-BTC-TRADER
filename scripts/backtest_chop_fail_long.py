@@ -26,7 +26,7 @@ def main():
     folder = ROOT / "results" / "exp-chop-fail-long-v1" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder.mkdir(parents=True, exist_ok=True)
     with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, FIELDS)
+        writer = csv.DictWriter(handle, FIELDS, extrasaction="ignore")
         writer.writeheader()
         writer.writerows(trades)
     row = _score(db.name, trades)
