@@ -1,4 +1,4 @@
-"""Desktop Hunt C-FI. swing-only skips CHOP. bank-1atr exits at 1 ATR."""
+"""Desktop Hunt C-FI. be-1atr moves the stop to entry after 1 ATR in favor."""
 
 import csv
 import json
@@ -20,15 +20,14 @@ FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit",
 
 def main():
     args = sys.argv[1:]
-    swing_only = "swing-only" in args
-    bank = "bank-1atr" in args
-    paths = [a for a in args if a not in ("swing-only", "bank-1atr")] or [None]
+    be = "be-1atr" in args
+    paths = [a for a in args if a != "be-1atr"] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
-        print(f"{db.name} 1m={info.rows} swing_only={swing_only} bank_1atr={bank}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), swing_only, bank)
-        name = "exp-hunt-desktop-cfi-bank1" if bank else ("exp-hunt-desktop-cfi-swing" if swing_only else "exp-hunt-desktop-cfi-v1")
+        print(f"{db.name} 1m={info.rows} be_1atr={be}")
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), be)
+        name = "exp-hunt-desktop-cfi-be1" if be else "exp-hunt-desktop-cfi-v1"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -36,13 +35,12 @@ def main():
             writer.writeheader()
             writer.writerows(trades)
         row = _score(db.name, trades)
-        row["swing_only"] = swing_only
-        row["bank_1atr"] = bank
+        row["be_1atr"] = be
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only, bank):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, be):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -65,8 +63,6 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only, bank):
         if not side:
             continue
         flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs_4h)
-        if swing_only and flag == "CHOP":
-            continue
         if flag == "SWING_UP" and side != "LONG":
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
@@ -88,13 +84,13 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only, bank):
         atr = atrs[j15 - 1]
         slip = 0.1 + level * 0.00005
         entry = level + slip if side == "LONG" else level - slip
-        take = 1.0 if bank else 2.5
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
             "entry": entry,
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
-            "target": entry + take * atr if side == "LONG" else entry - take * atr,
-            "risk": 1.5 * atr, "entry_time": entry_time,
+            "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
+            "arm": entry + atr if side == "LONG" else entry - atr,
+            "be": be, "risk": 1.5 * atr, "entry_time": entry_time,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
         if done:
@@ -234,21 +230,26 @@ def _walk(trade, bars, start, end):
             lo = mid + 1
         else:
             hi = mid
+    armed = False
     for bar in bars[lo:]:
         if bar.open_time >= end:
             break
         stop_hit = bar.low <= trade["stop"] if side == "LONG" else bar.high >= trade["stop"]
         target_hit = bar.high >= trade["target"] if side == "LONG" else bar.low <= trade["target"]
-        if not stop_hit and not target_hit:
-            continue
-        price = trade["stop"] if stop_hit else trade["target"]
-        gross = price - trade["entry"] if side == "LONG" else trade["entry"] - price
-        trade["exit"] = price
-        trade["exit_time"] = bar.open_time
-        trade["exit_reason"] = "STOP" if stop_hit else "TARGET"
-        trade["net_pnl"] = gross - (trade["entry"] + price) * 0.0002
-        trade["r_multiple"] = trade["net_pnl"] / trade["risk"]
-        return trade
+        if stop_hit or target_hit:
+            price = trade["stop"] if stop_hit else trade["target"]
+            gross = price - trade["entry"] if side == "LONG" else trade["entry"] - price
+            trade["exit"] = price
+            trade["exit_time"] = bar.open_time
+            trade["exit_reason"] = "STOP" if stop_hit else "TARGET"
+            trade["net_pnl"] = gross - (trade["entry"] + price) * 0.0002
+            trade["r_multiple"] = trade["net_pnl"] / trade["risk"]
+            return trade
+        if trade["be"] and not armed:
+            reached = bar.high >= trade["arm"] if side == "LONG" else bar.low <= trade["arm"]
+            if reached:
+                trade["stop"] = trade["entry"]
+                armed = True
     return None
 
 
