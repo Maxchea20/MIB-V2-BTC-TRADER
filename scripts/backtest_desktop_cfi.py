@@ -1,4 +1,4 @@
-"""Desktop Hunt C-FI. be-1atr moves the stop to entry after 1 ATR in favor."""
+"""Desktop Hunt C-FI. be-1atr moves the stop 4 bp past entry after 1 ATR in favor."""
 
 import csv
 import json
@@ -248,7 +248,8 @@ def _walk(trade, bars, start, end):
         if trade["be"] and not armed:
             reached = bar.high >= trade["arm"] if side == "LONG" else bar.low <= trade["arm"]
             if reached:
-                trade["stop"] = trade["entry"]
+                cover = trade["entry"] * 0.0004
+                trade["stop"] = trade["entry"] + cover if side == "LONG" else trade["entry"] - cover
                 armed = True
     return None
 
