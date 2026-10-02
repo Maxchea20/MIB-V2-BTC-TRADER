@@ -58,6 +58,7 @@ def main() -> None:
         "exp-hunt-lookback-20-trend",
         "exp-hunt-lookback-20-trend-17",
         "exp-mtf-4h-1h-15m-v1",
+        "exp-mtf-4h-1h-15m-tp24",
         "exp-mtf-1h-15m-5m-v1",
     }
     if args.experiment not in allowed:
