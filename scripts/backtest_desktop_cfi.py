@@ -33,6 +33,8 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
     open_trade = None
     quiet_until = 0
     atrs = _atr(bars_15)
+    fast = _events(bars_15, 5)
+    internal = _events(bars_15, 2)
     for j, bar in enumerate(bars_5):
         slot_start = (bar.open_time // FIFTEEN) * FIFTEEN
         if bar.open_time not in (slot_start, slot_start + FIVE, slot_start + 2 * FIVE):
@@ -44,10 +46,10 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
         j1 = _closed(bars_1h, bar.open_time + FIVE, 3_600_000)
         if j15 < 60 or j4 < 20 or not atrs[j15 - 1]:
             continue
-        side, event, gate = _gate(bars_15, j15)
+        side, event, gate = _gate(fast, internal, j15)
         if not side:
             continue
-        flag = _weather(bars_4h[:j4], bars_1h[:j1])
+        flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs and _atr(bars_4h))
         if flag == "SWING_UP" and side != "LONG":
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
@@ -69,12 +71,12 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
         atr = atrs[j15 - 1]
         slip = 0.1 + level * 0.00005
         entry = level + slip if side == "LONG" else level - slip
-        stop = entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr
-        target = entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
-            "entry": entry, "stop": stop, "target": target, "risk": abs(entry - stop),
-            "entry_time": entry_time,
+            "entry": entry,
+            "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
+            "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
+            "risk": 1.5 * atr, "entry_time": entry_time,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
         if done:
@@ -88,36 +90,42 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
     return [t for t in trades if t["exit_reason"] != "END_OF_DATA"]
 
 
-def _gate(bars, j):
-    fast = _event(bars, j, 5)
-    if fast and fast[2] == j - 6:
-        return fast[0], fast[1], "cfast"
-    internal = _event(bars, j, 2)
-    if internal and internal[2] == j - 3:
-        return internal[0], internal[1], "internal"
-    lingering = fast or internal
-    if not lingering:
-        return None, None, None
-    return lingering[0], lingering[1], "rearm"
-
-
-def _event(bars, j, lr):
+def _events(bars, lr):
+    out = [None] * len(bars)
     last = None
     streak = 0
     streak_side = None
-    for i in range(lr, j - lr):
+    for i in range(lr, len(bars) - lr):
         left, right = bars[i - lr:i], bars[i + 1:i + 1 + lr]
         if bars[i].high > max(b.high for b in left) and bars[i].high >= max(b.high for b in right):
             side = "LONG"
         elif bars[i].low < min(b.low for b in left) and bars[i].low <= min(b.low for b in right):
             side = "SHORT"
         else:
+            out[i + lr] = last
             continue
         event = "CHoCH" if streak_side not in (None, side) else "BOS"
         streak = streak + 1 if streak_side == side else 1
         streak_side = side
         last = None if event == "BOS" and streak >= 3 else (side, event, i + lr)
-    return last
+        out[i + lr] = last
+    for i in range(1, len(out)):
+        if out[i] is None:
+            out[i] = out[i - 1]
+    return out
+
+
+def _gate(fast, internal, j):
+    got = fast[j - 1] if j else None
+    if got and got[2] == j - 1:
+        return got[0], got[1], "cfast"
+    got = internal[j - 1] if j else None
+    if got and got[2] == j - 1:
+        return got[0], got[1], "internal"
+    lingering = (fast[j - 1] if j else None) or (internal[j - 1] if j else None)
+    if not lingering:
+        return None, None, None
+    return lingering[0], lingering[1], "rearm"
 
 
 def _answers(side, level, live, slot, atr):
@@ -135,9 +143,9 @@ def _answers(side, level, live, slot, atr):
     return False
 
 
-def _weather(rows, rows_1h):
-    atr = _atr(rows)[-1]
-    old = _atr(rows[:-10])[-1] if len(rows) >= 24 else None
+def _weather(rows, rows_1h, atrs):
+    atr = atrs[len(rows) - 1]
+    old = atrs[len(rows) - 11] if len(rows) >= 24 else None
     opening = bool(atr and old and old > 0 and atr / old >= 1.4)
     up, down = _votes(rows)
     close_side = "SWING_UP" if up >= 5 else ("SWING_DOWN" if down >= 5 else None)
@@ -201,9 +209,16 @@ def _closed(bars, ts, span):
 
 def _walk(trade, bars, start, end):
     side = trade["side"]
-    for bar in bars:
-        if bar.open_time < start or bar.open_time >= end:
-            continue
+    lo, hi = 0, len(bars)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if bars[mid].open_time < start:
+            lo = mid + 1
+        else:
+            hi = mid
+    for bar in bars[lo:]:
+        if bar.open_time >= end:
+            break
         stop_hit = bar.low <= trade["stop"] if side == "LONG" else bar.high >= trade["stop"]
         target_hit = bar.high >= trade["target"] if side == "LONG" else bar.low <= trade["target"]
         if not stop_hit and not target_hit:
