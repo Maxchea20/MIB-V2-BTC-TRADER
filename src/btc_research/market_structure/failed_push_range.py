@@ -72,17 +72,19 @@ def _next(pivots, start, kind):
 
 def _walk(bars, high, low, body_min):
     phase = "RANGE"
+    side = None
     extreme = None
     for bar in bars:
         close = _close(bar)
         if phase == "BREAKOUT_CANDIDATE":
-            extreme = _high(bar) if extreme >= high else min(extreme, _low(bar))
+            extreme = max(extreme, _high(bar)) if side == "up" else min(extreme, _low(bar))
             if low <= close <= high:
-                if extreme >= high:
+                if side == "up":
                     high = extreme
                 else:
                     low = extreme
                 phase = "RANGE"
+                side = None
                 extreme = None
                 continue
             if _solid(bar, high, low, body_min):
@@ -90,7 +92,8 @@ def _walk(bars, high, low, body_min):
             continue
         if _solid(bar, high, low, body_min):
             phase = "BREAKOUT_CANDIDATE"
-            extreme = _high(bar) if close > high else _low(bar)
+            side = "up" if close > high else "down"
+            extreme = _high(bar) if side == "up" else _low(bar)
     return high, low, phase
 
 
