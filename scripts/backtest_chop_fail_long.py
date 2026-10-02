@@ -39,10 +39,9 @@ def _run(bars, bars_5, bars_15):
     trades = []
     counts = {"ranges": 0, "sweeps": 0, "reclaims": 0, "triggers": 0}
     atrs = _atr(bars_15)
-    opens = {bar.open_time: bar for bar in bars}
     quiet_until = 0
     sweep = None
-    for j, bar in enumerate(bars_5):
+    for bar in bars_5:
         j15 = _closed(bars_15, bar.open_time + FIVE, FIFTEEN)
         if j15 < 21 or not atrs[j15 - 1]:
             continue
@@ -58,17 +57,23 @@ def _run(bars, bars_5, bars_15):
         if sweep is None and bar.low < range_low and bar.open_time >= quiet_until:
             edge = range_low + 0.25 * (range_high - range_low)
             if bar.open <= edge:
-                sweep = {"low": bar.low, "deadline": bar.open_time + 30 * 60_000, "range_low": range_low, "range_high": range_high}
+                sweep = {
+                    "low": bar.low,
+                    "deadline": bar.open_time + 30 * 60_000,
+                    "range_low": range_low,
+                    "range_high": range_high,
+                }
                 counts["sweeps"] += 1
             continue
-        if not sweep or bar.close <= sweep["range_low"]:
-            if sweep:
-                sweep["low"] = min(sweep["low"], bar.low)
+        if not sweep:
+            continue
+        sweep["low"] = min(sweep["low"], bar.low)
+        if bar.close <= sweep["range_low"]:
             continue
         counts["reclaims"] += 1
-        reclaim_time = bar.open_time + FIVE
-        trigger = _trigger(bars, opens, reclaim_time, sweep["range_low"])
+        held = sweep
         sweep = None
+        trigger = _trigger(bars, bar.open_time + FIVE, held["range_low"])
         if not trigger:
             continue
         counts["triggers"] += 1
@@ -77,31 +82,23 @@ def _run(bars, bars_5, bars_15):
             continue
         slip = 0.1 + entry_open * 0.00005
         entry = entry_open + slip
-        stop = sweep_stop(sweep_low_from(trades, bar, range_low), entry, slip)
-        done = _fire(bars, entry, entry_time, stop, (range_low + range_high) / 2, quiet_until)
-        if not done:
+        stop = held["low"] - slip
+        target = (held["range_low"] + held["range_high"]) / 2
+        if target <= entry or stop >= entry:
+            continue
+        trade = {
+            "side": "LONG", "entry": entry, "stop": stop, "target": target,
+            "risk": entry - stop, "entry_time": entry_time,
+        }
+        done = _walk(trade, bars, entry_time, bars[-1].open_time + 60_000)
+        if not done or done["exit_reason"] == "END_OF_DATA":
             continue
         trades.append(done)
         quiet_until = done["exit_time"] + FIFTEEN
-    return [t for t in trades if t["exit_reason"] != "END_OF_DATA"], counts
+    return trades, counts
 
 
-def sweep_stop(low, entry, slip):
-    return low - slip
-
-
-def sweep_low_from(trades, bar, range_low):
-    return min(bar.low, range_low)
-
-
-def _fire(bars, entry, entry_time, stop, target, quiet_until):
-    if target <= entry or stop >= entry:
-        return None
-    trade = {"side": "LONG", "entry": entry, "stop": stop, "target": target, "risk": entry - stop, "entry_time": entry_time}
-    return _walk(trade, bars, entry_time, bars[-1].open_time + 60_000)
-
-
-def _trigger(bars, opens, reclaim_time, level):
+def _trigger(bars, reclaim_time, level):
     lo, hi = 0, len(bars)
     while lo < hi:
         mid = (lo + hi) // 2
@@ -111,8 +108,7 @@ def _trigger(bars, opens, reclaim_time, level):
             hi = mid
     for i, bar in enumerate(bars[lo:lo + 30], start=lo):
         if bar.close > bar.open and bar.close > level and i + 1 < len(bars):
-            nxt = bars[i + 1]
-            return nxt.open_time, nxt.open
+            return bars[i + 1].open_time, bars[i + 1].open
     return None
 
 
