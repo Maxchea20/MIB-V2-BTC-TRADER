@@ -1,4 +1,4 @@
-"""Desktop Hunt C-FI. be-1atr moves the stop 4 bp past entry after 1 ATR in favor."""
+"""Desktop Hunt C-FI. trail-1atr follows 1 ATR behind the best price after 1 ATR in favor."""
 
 import csv
 import json
@@ -20,14 +20,14 @@ FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit",
 
 def main():
     args = sys.argv[1:]
-    be = "be-1atr" in args
-    paths = [a for a in args if a != "be-1atr"] or [None]
+    trail = "trail-1atr" in args
+    paths = [a for a in args if a != "trail-1atr"] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
-        print(f"{db.name} 1m={info.rows} be_1atr={be}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), be)
-        name = "exp-hunt-desktop-cfi-be1" if be else "exp-hunt-desktop-cfi-v1"
+        print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail)
+        name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -35,12 +35,12 @@ def main():
             writer.writeheader()
             writer.writerows(trades)
         row = _score(db.name, trades)
-        row["be_1atr"] = be
+        row["trail_1atr"] = trail
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, be):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -90,7 +90,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, be):
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
             "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
             "arm": entry + atr if side == "LONG" else entry - atr,
-            "be": be, "risk": 1.5 * atr, "entry_time": entry_time,
+            "atr": atr, "trail": trail, "risk": 1.5 * atr, "entry_time": entry_time,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
         if done:
@@ -231,6 +231,7 @@ def _walk(trade, bars, start, end):
         else:
             hi = mid
     armed = False
+    best = trade["entry"]
     for bar in bars[lo:]:
         if bar.open_time >= end:
             break
@@ -245,12 +246,22 @@ def _walk(trade, bars, start, end):
             trade["net_pnl"] = gross - (trade["entry"] + price) * 0.0002
             trade["r_multiple"] = trade["net_pnl"] / trade["risk"]
             return trade
-        if trade["be"] and not armed:
-            reached = bar.high >= trade["arm"] if side == "LONG" else bar.low <= trade["arm"]
-            if reached:
-                cover = trade["entry"] * 0.0004
-                trade["stop"] = trade["entry"] + cover if side == "LONG" else trade["entry"] - cover
+        if not trade["trail"]:
+            continue
+        if side == "LONG":
+            best = max(best, bar.high)
+            if best >= trade["arm"]:
                 armed = True
+            if armed:
+                floor = trade["entry"] * 1.0004
+                trade["stop"] = max(trade["stop"], best - trade["atr"], floor)
+        else:
+            best = min(best, bar.low)
+            if best <= trade["arm"]:
+                armed = True
+            if armed:
+                floor = trade["entry"] * 0.9996
+                trade["stop"] = min(trade["stop"], best + trade["atr"], floor)
     return None
 
 
