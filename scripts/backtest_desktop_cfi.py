@@ -34,14 +34,14 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
     quiet_until = 0
     atrs = _atr(bars_15)
     for j, bar in enumerate(bars_5):
-        slot_start = (bar["ts"] // FIFTEEN) * FIFTEEN
-        if bar["ts"] != slot_start and bar["ts"] != slot_start + FIVE and bar["ts"] != slot_start + 2 * FIVE:
+        slot_start = (bar.open_time // FIFTEEN) * FIFTEEN
+        if bar.open_time not in (slot_start, slot_start + FIVE, slot_start + 2 * FIVE):
             continue
-        slot = (bar["ts"] - slot_start) // FIVE + 1
-        live = [b for b in bars_5[max(0, j - 2):j + 1] if b["ts"] >= slot_start]
+        slot = (bar.open_time - slot_start) // FIVE + 1
+        live = [b for b in bars_5[max(0, j - 2):j + 1] if b.open_time >= slot_start]
         j15 = _closed(bars_15, slot_start, FIFTEEN)
-        j4 = _closed(bars_4h, bar["ts"] + FIVE, 14_400_000)
-        j1 = _closed(bars_1h, bar["ts"] + FIVE, 3_600_000)
+        j4 = _closed(bars_4h, bar.open_time + FIVE, 14_400_000)
+        j1 = _closed(bars_1h, bar.open_time + FIVE, 3_600_000)
         if j15 < 60 or j4 < 20 or not atrs[j15 - 1]:
             continue
         side, event, gate = _gate(bars_15, j15)
@@ -52,10 +52,10 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
             continue
-        level = bars_15[j15 - 1]["high"] if side == "LONG" else bars_15[j15 - 1]["low"]
+        level = bars_15[j15 - 1].high if side == "LONG" else bars_15[j15 - 1].low
         if not _answers(side, level, live, slot, atrs[j15 - 1]):
             continue
-        entry_time = bar["ts"] + FIVE
+        entry_time = bar.open_time + FIVE
         if open_trade and entry_time >= open_trade["entry_time"]:
             done = _walk(open_trade, bars, open_trade["entry_time"], entry_time)
             if done:
@@ -74,7 +74,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
             "entry": entry, "stop": stop, "target": target, "risk": abs(entry - stop),
-            "entry_time": entry_time, "fill_bar": bar,
+            "entry_time": entry_time,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
         if done:
@@ -82,7 +82,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
             quiet_until = done["exit_time"] + 15 * 60_000
             open_trade = None
     if open_trade:
-        done = _walk(open_trade, bars, open_trade["entry_time"], bars[-1]["ts"] + 60_000)
+        done = _walk(open_trade, bars, open_trade["entry_time"], bars[-1].open_time + 60_000)
         if done:
             trades.append(done)
     return [t for t in trades if t["exit_reason"] != "END_OF_DATA"]
@@ -106,11 +106,10 @@ def _event(bars, j, lr):
     streak = 0
     streak_side = None
     for i in range(lr, j - lr):
-        high, low = bars[i]["high"], bars[i]["low"]
         left, right = bars[i - lr:i], bars[i + 1:i + 1 + lr]
-        if high > max(b["high"] for b in left) and high >= max(b["high"] for b in right):
+        if bars[i].high > max(b.high for b in left) and bars[i].high >= max(b.high for b in right):
             side = "LONG"
-        elif low < min(b["low"] for b in left) and low <= min(b["low"] for b in right):
+        elif bars[i].low < min(b.low for b in left) and bars[i].low <= min(b.low for b in right):
             side = "SHORT"
         else:
             continue
@@ -122,16 +121,16 @@ def _event(bars, j, lr):
 
 
 def _answers(side, level, live, slot, atr):
-    close = live[-1]["close"]
+    close = live[-1].close
     if side == "LONG" and close > level and close - level >= 0.15 * atr:
         return True
     if side == "SHORT" and close < level and level - close >= 0.15 * atr:
         return True
     if slot < 2:
         return False
-    if side == "LONG" and max(b["high"] for b in live[:-1]) > level and close >= level:
+    if side == "LONG" and max(b.high for b in live[:-1]) > level and close >= level:
         return True
-    if side == "SHORT" and min(b["low"] for b in live[:-1]) < level and close <= level:
+    if side == "SHORT" and min(b.low for b in live[:-1]) < level and close <= level:
         return True
     return False
 
@@ -160,19 +159,19 @@ def _weather(rows, rows_1h):
 def _votes(rows):
     up = down = 0
     for a, b in zip(rows[-7:-1], rows[-6:]):
-        up += b["close"] > a["close"]
-        down += b["close"] < a["close"]
+        up += b.close > a.close
+        down += b.close < a.close
     return up, down
 
 
 def _body(bar):
-    span = bar["high"] - bar["low"]
-    if span <= 0 or abs(bar["close"] - bar["open"]) / span < 0.5:
+    span = bar.high - bar.low
+    if span <= 0 or abs(bar.close - bar.open) / span < 0.5:
         return None
     third = span / 3
-    if bar["close"] >= bar["high"] - third and bar["close"] > bar["open"]:
+    if bar.close >= bar.high - third and bar.close > bar.open:
         return "SWING_UP"
-    if bar["close"] <= bar["low"] + third and bar["close"] < bar["open"]:
+    if bar.close <= bar.low + third and bar.close < bar.open:
         return "SWING_DOWN"
     return None
 
@@ -181,10 +180,10 @@ def _atr(bars):
     out = [None] * len(bars)
     for i in range(15, len(bars)):
         acc = 0.0
-        prev = bars[i - 14]["close"]
+        prev = bars[i - 14].close
         for bar in bars[i - 13:i + 1]:
-            acc += max(bar["high"] - bar["low"], abs(bar["high"] - prev), abs(bar["low"] - prev))
-            prev = bar["close"]
+            acc += max(bar.high - bar.low, abs(bar.high - prev), abs(bar.low - prev))
+            prev = bar.close
         out[i] = acc / 14
     return out
 
@@ -193,7 +192,7 @@ def _closed(bars, ts, span):
     lo, hi = 0, len(bars)
     while lo < hi:
         mid = (lo + hi) // 2
-        if bars[mid]["ts"] + span <= ts:
+        if bars[mid].open_time + span <= ts:
             lo = mid + 1
         else:
             hi = mid
@@ -203,16 +202,16 @@ def _closed(bars, ts, span):
 def _walk(trade, bars, start, end):
     side = trade["side"]
     for bar in bars:
-        if bar["ts"] < start or bar["ts"] >= end:
+        if bar.open_time < start or bar.open_time >= end:
             continue
-        stop_hit = bar["low"] <= trade["stop"] if side == "LONG" else bar["high"] >= trade["stop"]
-        target_hit = bar["high"] >= trade["target"] if side == "LONG" else bar["low"] <= trade["target"]
+        stop_hit = bar.low <= trade["stop"] if side == "LONG" else bar.high >= trade["stop"]
+        target_hit = bar.high >= trade["target"] if side == "LONG" else bar.low <= trade["target"]
         if not stop_hit and not target_hit:
             continue
         price = trade["stop"] if stop_hit else trade["target"]
         gross = price - trade["entry"] if side == "LONG" else trade["entry"] - price
         trade["exit"] = price
-        trade["exit_time"] = bar["ts"]
+        trade["exit_time"] = bar.open_time
         trade["exit_reason"] = "STOP" if stop_hit else "TARGET"
         trade["net_pnl"] = gross - (trade["entry"] + price) * 0.0002
         trade["r_multiple"] = trade["net_pnl"] / trade["risk"]
