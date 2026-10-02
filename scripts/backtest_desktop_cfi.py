@@ -1,4 +1,4 @@
-"""One backtest of the desktop Hunt C-FI history. Weather V1, no soften."""
+"""Desktop Hunt C-FI. Optional swing-only skips CHOP."""
 
 import csv
 import json
@@ -19,27 +19,30 @@ FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit",
 
 
 def main():
-    paths = sys.argv[1:] or [None]
+    args = sys.argv[1:]
+    swing_only = "swing-only" in args
+    paths = [a for a in args if a != "swing-only"] or [None]
     rows = []
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
-        print(f"{db.name} 1m={info.rows} {info.start_ms}..{info.end_ms}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"))
-        folder = ROOT / "results" / "exp-hunt-desktop-cfi-v1" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        print(f"{db.name} 1m={info.rows} {info.start_ms}..{info.end_ms} swing_only={swing_only}")
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), swing_only)
+        name = "exp-hunt-desktop-cfi-swing" if swing_only else "exp-hunt-desktop-cfi-v1"
+        folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, FIELDS, extrasaction="ignore")
             writer.writeheader()
             writer.writerows(trades)
         row = _score(db.name, trades)
+        row["swing_only"] = swing_only
         row["file"] = str(folder / "trades.csv")
         rows.append(row)
         print(json.dumps(row, indent=2))
-    print(json.dumps({"note": "Desktop C-FI history. Weather V1. Same-bar stop wins.", "rows": rows}, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -62,6 +65,8 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
         if not side:
             continue
         flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs_4h)
+        if swing_only and flag == "CHOP":
+            continue
         if flag == "SWING_UP" and side != "LONG":
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
@@ -252,10 +257,16 @@ def _bucket(trades):
     wins = [t for t in trades if t["net_pnl"] > 0]
     losses = [t for t in trades if t["net_pnl"] <= 0]
     gross_loss = abs(sum(t["net_pnl"] for t in losses))
+    equity = peak = dip = 0.0
+    for trade in trades:
+        equity += trade["r_multiple"]
+        peak = max(peak, equity)
+        dip = min(dip, equity - peak)
     return {
         "n": len(trades),
         "expectancy_r": round(sum(t["r_multiple"] for t in trades) / len(trades), 4),
         "profit_factor": round(sum(t["net_pnl"] for t in wins) / gross_loss, 4) if gross_loss else None,
+        "drawdown_r": round(dip, 2),
         "stops": sum(t["exit_reason"] == "STOP" for t in trades),
         "targets": sum(t["exit_reason"] == "TARGET" for t in trades),
     }
@@ -263,9 +274,7 @@ def _bucket(trades):
 
 def _score(name, trades):
     out = {"db": name, "combined": _bucket(trades)}
-    out["by_gate"] = {gate: _bucket([t for t in trades if t["gate"] == gate]) for gate in ("cfast", "internal", "rearm")}
     out["by_side"] = {side: _bucket([t for t in trades if t["side"] == side]) for side in ("LONG", "SHORT")}
-    out["by_event"] = {event: _bucket([t for t in trades if t["event"] == event]) for event in ("BOS", "CHoCH")}
     out["by_weather"] = {flag: _bucket([t for t in trades if t["weather"] == flag]) for flag in ("SWING_UP", "SWING_DOWN", "CHOP")}
     return out
 
