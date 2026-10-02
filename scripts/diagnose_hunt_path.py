@@ -20,7 +20,6 @@ def main():
         ROOT / "results" / "exp-hunt-desktop-cfi-v1",
         ROOT / "results" / "exp-hunt-desktop-cfi-swing",
     ]
-    rows = []
     for folder in folders:
         files = sorted(folder.glob("*/trades.csv"))
         if not files:
@@ -29,26 +28,28 @@ def main():
         row = {"file": str(files[-1]), "combined": _path(trades, bars)}
         row["long"] = _path([t for t in trades if t["side"] == "LONG"], bars)
         row["short"] = _path([t for t in trades if t["side"] == "SHORT"], bars)
-        rows.append(row)
         print(json.dumps(row, indent=2))
-    if not rows:
+    if not any(folder.glob("*/trades.csv") for folder in folders):
         raise SystemExit("no Hunt trades.csv")
 
 
 def _path(trades, bars):
     out = {"n": len(trades), "target_straight": 0, "target_after_going_against": 0, "stop_straight": 0, "stop_after_going_in_favor": 0}
-    if not trades:
-        return out
     for trade in trades:
         side = trade["side"]
         entry = float(trade["entry"])
         risk = abs(entry - float(trade["stop"]))
         start = int(trade["entry_time"])
         end = int(trade["exit_time"])
+        lo, hi = 0, len(bars)
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if bars[mid].open_time < start:
+                lo = mid + 1
+            else:
+                hi = mid
         against = favor = 0.0
-        for bar in bars:
-            if bar.open_time < start:
-                continue
+        for bar in bars[lo:]:
             if bar.open_time > end:
                 break
             if side == "LONG":
