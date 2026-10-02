@@ -1,4 +1,4 @@
-"""Failed-push range. A solid close outside is a candidate, not the end of the box."""
+"""Failed-push range. A return inside expands the box to the failed extreme."""
 
 from __future__ import annotations
 
@@ -38,10 +38,8 @@ def detect_push_range(bars, params: PushParams | None = None) -> PushRange:
     state = _sequence(pivots, atr * params.similar_atr)
     if not state:
         return empty
-    return PushRange(
-        True, state["high"], state["low"], state["a"], state["a1"], state["aa"], state["a2"], state["ab"],
-        _phase(bars, state["high"], state["low"], params.body_min),
-    )
+    high, low, phase = _walk(bars, state["high"], state["low"], params.body_min)
+    return PushRange(phase != "BREAKOUT_CONFIRMED", high, low, state["a"], state["a1"], state["aa"], state["a2"], state["ab"], phase)
 
 
 def _sequence(pivots, similar):
@@ -72,16 +70,28 @@ def _next(pivots, start, kind):
     return None
 
 
-def _phase(bars, high, low, body_min):
+def _walk(bars, high, low, body_min):
     phase = "RANGE"
+    extreme = None
     for bar in bars:
         close = _close(bar)
         if phase == "BREAKOUT_CANDIDATE":
-            phase = "RANGE" if low <= close <= high else "BREAKOUT_CONFIRMED"
+            extreme = _high(bar) if extreme >= high else min(extreme, _low(bar))
+            if low <= close <= high:
+                if extreme >= high:
+                    high = extreme
+                else:
+                    low = extreme
+                phase = "RANGE"
+                extreme = None
+                continue
+            if _solid(bar, high, low, body_min):
+                phase = "BREAKOUT_CONFIRMED"
             continue
         if _solid(bar, high, low, body_min):
             phase = "BREAKOUT_CANDIDATE"
-    return phase
+            extreme = _high(bar) if close > high else _low(bar)
+    return high, low, phase
 
 
 def _solid(bar, high, low, body_min):
