@@ -19,22 +19,24 @@ def main():
     bars_15 = resample(bars, "15m")
     bars_1h = resample(bars, "1h")
     print(f"{db.name} 15m={len(bars_15)} 1h={len(bars_1h)} {info.start_ms}..{info.end_ms}")
-    active = 0
-    checked = 0
-    scores = []
+    checked = score70 = score85 = score100 = hour_range = 0
+    hour_i = 0
     for i in range(80, len(bars_15)):
         hour_end = bars_15[i].open_time
-        hour = [b for b in bars_1h if b.open_time + 3_600_000 <= hour_end][-80:]
-        state = detect_range(bars_15[: i + 1], hour or None)
+        while hour_i < len(bars_1h) and bars_1h[hour_i].open_time + 3_600_000 <= hour_end:
+            hour_i += 1
+        state = detect_range(bars_15[max(0, i - 79): i + 1], bars_1h[max(0, hour_i - 80):hour_i] or None)
         checked += 1
-        active += state.active
-        if state.active:
-            scores.append(state.score)
+        score70 += state.score >= 70
+        score85 += state.score >= 85
+        score100 += state.score >= 100
+        hour_range += state.context == "RANGE"
     print(json.dumps({
         "checked": checked,
-        "active_bars": active,
-        "active_share": round(active / checked, 4) if checked else 0,
-        "median_score": sorted(scores)[len(scores) // 2] if scores else None,
+        "score_70_share": round(score70 / checked, 4),
+        "score_85_share": round(score85 / checked, 4),
+        "score_100_share": round(score100 / checked, 4),
+        "hour_range_share": round(hour_range / checked, 4),
     }, indent=2))
 
 
