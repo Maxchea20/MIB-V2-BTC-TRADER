@@ -1,4 +1,4 @@
-"""Desktop Hunt C-FI. Optional swing-only skips CHOP."""
+"""Desktop Hunt C-FI. swing-only skips CHOP. bank-1atr exits at 1 ATR."""
 
 import csv
 import json
@@ -21,14 +21,14 @@ FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit",
 def main():
     args = sys.argv[1:]
     swing_only = "swing-only" in args
-    paths = [a for a in args if a != "swing-only"] or [None]
-    rows = []
+    bank = "bank-1atr" in args
+    paths = [a for a in args if a not in ("swing-only", "bank-1atr")] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
-        print(f"{db.name} 1m={info.rows} {info.start_ms}..{info.end_ms} swing_only={swing_only}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), swing_only)
-        name = "exp-hunt-desktop-cfi-swing" if swing_only else "exp-hunt-desktop-cfi-v1"
+        print(f"{db.name} 1m={info.rows} swing_only={swing_only} bank_1atr={bank}")
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), swing_only, bank)
+        name = "exp-hunt-desktop-cfi-bank1" if bank else ("exp-hunt-desktop-cfi-swing" if swing_only else "exp-hunt-desktop-cfi-v1")
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -37,12 +37,12 @@ def main():
             writer.writerows(trades)
         row = _score(db.name, trades)
         row["swing_only"] = swing_only
+        row["bank_1atr"] = bank
         row["file"] = str(folder / "trades.csv")
-        rows.append(row)
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only, bank):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -88,11 +88,12 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, swing_only):
         atr = atrs[j15 - 1]
         slip = 0.1 + level * 0.00005
         entry = level + slip if side == "LONG" else level - slip
+        take = 1.0 if bank else 2.5
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
             "entry": entry,
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
-            "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
+            "target": entry + take * atr if side == "LONG" else entry - take * atr,
             "risk": 1.5 * atr, "entry_time": entry_time,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
@@ -273,10 +274,7 @@ def _bucket(trades):
 
 
 def _score(name, trades):
-    out = {"db": name, "combined": _bucket(trades)}
-    out["by_side"] = {side: _bucket([t for t in trades if t["side"] == side]) for side in ("LONG", "SHORT")}
-    out["by_weather"] = {flag: _bucket([t for t in trades if t["weather"] == flag]) for flag in ("SWING_UP", "SWING_DOWN", "CHOP")}
-    return out
+    return {"db": name, "combined": _bucket(trades), "by_side": {side: _bucket([t for t in trades if t["side"] == side]) for side in ("LONG", "SHORT")}}
 
 
 if __name__ == "__main__":
