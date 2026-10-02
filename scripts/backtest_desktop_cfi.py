@@ -1,7 +1,9 @@
 """One backtest of the desktop Hunt C-FI history. Weather V1, no soften."""
 
+import csv
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +15,7 @@ from btc_research.data.resample import resample
 
 FIVE = 300_000
 FIFTEEN = 900_000
+FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl")
 
 
 def main():
@@ -22,9 +25,17 @@ def main():
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} {info.start_ms}..{info.end_ms}")
-        row = _score(db.name, _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h")))
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"))
+        folder = ROOT / "results" / "exp-hunt-desktop-cfi-v1" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        folder.mkdir(parents=True, exist_ok=True)
+        with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, FIELDS, extrasaction="ignore")
+            writer.writeheader()
+            writer.writerows(trades)
+        row = _score(db.name, trades)
+        row["file"] = str(folder / "trades.csv")
         rows.append(row)
-        print(json.dumps(row))
+        print(json.dumps(row, indent=2))
     print(json.dumps({"note": "Desktop C-FI history. Weather V1. Same-bar stop wins.", "rows": rows}, indent=2))
 
 
@@ -235,29 +246,28 @@ def _walk(trade, bars, start, end):
     return None
 
 
-def _score(name, trades):
+def _bucket(trades):
     if not trades:
-        return {"db": name, "n": 0}
+        return {"n": 0}
     wins = [t for t in trades if t["net_pnl"] > 0]
     losses = [t for t in trades if t["net_pnl"] <= 0]
     gross_loss = abs(sum(t["net_pnl"] for t in losses))
-    equity = peak = dip = 0.0
-    for trade in trades:
-        equity += trade["r_multiple"]
-        peak = max(peak, equity)
-        dip = min(dip, equity - peak)
     return {
-        "db": name,
         "n": len(trades),
         "expectancy_r": round(sum(t["r_multiple"] for t in trades) / len(trades), 4),
         "profit_factor": round(sum(t["net_pnl"] for t in wins) / gross_loss, 4) if gross_loss else None,
-        "drawdown_r": round(dip, 2),
-        "cfast": sum(t["gate"] == "cfast" for t in trades),
-        "internal": sum(t["gate"] == "internal" for t in trades),
-        "rearm": sum(t["gate"] == "rearm" for t in trades),
-        "long_n": sum(t["side"] == "LONG" for t in trades),
-        "short_n": sum(t["side"] == "SHORT" for t in trades),
+        "stops": sum(t["exit_reason"] == "STOP" for t in trades),
+        "targets": sum(t["exit_reason"] == "TARGET" for t in trades),
     }
+
+
+def _score(name, trades):
+    out = {"db": name, "combined": _bucket(trades)}
+    out["by_gate"] = {gate: _bucket([t for t in trades if t["gate"] == gate]) for gate in ("cfast", "internal", "rearm")}
+    out["by_side"] = {side: _bucket([t for t in trades if t["side"] == side]) for side in ("LONG", "SHORT")}
+    out["by_event"] = {event: _bucket([t for t in trades if t["event"] == event]) for event in ("BOS", "CHoCH")}
+    out["by_weather"] = {flag: _bucket([t for t in trades if t["weather"] == flag]) for flag in ("SWING_UP", "SWING_DOWN", "CHOP")}
+    return out
 
 
 if __name__ == "__main__":
