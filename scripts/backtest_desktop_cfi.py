@@ -33,6 +33,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
     open_trade = None
     quiet_until = 0
     atrs = _atr(bars_15)
+    atrs_4h = _atr(bars_4h)
     fast = _events(bars_15, 5)
     internal = _events(bars_15, 2)
     for j, bar in enumerate(bars_5):
@@ -49,7 +50,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h):
         side, event, gate = _gate(fast, internal, j15)
         if not side:
             continue
-        flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs and _atr(bars_4h))
+        flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs_4h)
         if flag == "SWING_UP" and side != "LONG":
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
