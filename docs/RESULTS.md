@@ -22,7 +22,21 @@ Desktop Hunt C-FI on its own (`backtest_desktop_cfi.py`, file `exp-hunt-desktop-
 
 Hunt stays positive on 2019-21, so lock 2 holds out of sample on both sides.
 
-**Invalid run, do not use:** `backtest_hunt_chop.py` on `research_2019_21.db` printed chop 201 trades, +0.3928R, dip -26.38R, and one-position 2182 trades, +0.1329R. It took the 2025-26 Hunt file (`20261002T090757Z`, 1981 trades) because the 2019-21 Hunt file did not exist yet. That mixes two years. Rerun it with the `20261003T024202Z` Hunt file. The chop-only line is still real 2019-21 data, but it was not measured against the right Hunt book.
+Lock 3 switch (`backtest_hunt_chop.py`, matching Hunt file `20261003T024202Z`):
+
+| Book | Trades | Avg R | Max dip | Total R |
+|---|---|---|---|---|
+| Full Hunt | 3620 | +0.1082R | -26.59R | +392 |
+| Hunt outside the box | 1904 | +0.1258R | -21.72R | +240 |
+| Hunt inside the box (dropped by the switch) | 1716 | +0.089R | - | +152 |
+| Chop alone | 201 | +0.3928R | -26.38R | +79 |
+| **Switch, one position** | 1526 (Hunt 1376, chop 150) | +0.1516R | **-40.89R** | +231 |
+
+Total R and the inside-box line are derived (trades x avg R), not printed by the script.
+
+Read: the switch lifts the average per trade (+0.108R to +0.152R) but it does not hold up as lock 3 claimed. Max dip is worse, -40.9R against -26.6R for plain Hunt, where 2025-26 had it halved. Total R falls about 41%. The box drops Hunt trades that are still positive on this file (+0.089R). One-position blocking costs a lot: 1904 outside-box Hunt trades shrink to 1376, and 51 of the 201 chop trades are lost to overlap. Chop alone is strong here (+0.39R), but its dip is -26.4R on 201 trades.
+
+An earlier run of the same script (chop 201, one-position 2182 trades, +0.1329R) mixed in the 2025-26 Hunt file and is invalid.
 
 ## Lock 3 rule, short
 
@@ -39,5 +53,5 @@ Hunt stays positive on 2019-21, so lock 2 holds out of sample on both sides.
 
 ## Not yet tested
 
-- Lock 3 on 2019-21 (rerun with the matching Hunt file) and on 2022-25.
+- Lock 3 on 2022-25.
 - Lock 2 on 2022-25.
