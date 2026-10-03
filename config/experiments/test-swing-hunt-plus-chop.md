@@ -1,4 +1,4 @@
-# Lock 4: swing Hunt plus the chop book
+# Test: swing Hunt plus the chop book
 
 Written 2026-10-03. Not a live book. Hunt trades only in swing weather. The chop book trades only inside the 1-hour failed-push box. There is no Hunt in CHOP weather.
 
@@ -20,7 +20,7 @@ Run with `scripts/run_swing_only.py`, on the saved Hunt file of each period.
 | 2022-25 | 891 | +0.251 | -24.4 | +224 | 568 / 323 |
 | 2025-26 | 288 | +0.422 | -19.6 | +122 | 177 / 111 |
 
-Per trade it beats both lock 3 (+0.152, +0.208, +0.191) and plain Hunt (+0.108, +0.124, +0.107) on every file. Total R is lower than lock 3 (231, 532, 182) because it takes fewer trades.
+Per trade it beats both Hunt V3 (+0.152, +0.208, +0.191) and plain Hunt (+0.108, +0.124, +0.107) on every file. Total R is lower than Hunt V3 (231, 532, 182) because it takes fewer trades.
 
 ## Known weak points
 

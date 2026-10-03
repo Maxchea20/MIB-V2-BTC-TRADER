@@ -1,21 +1,23 @@
 # Backtest results log
 
+Baseline: Hunt V3 (config/experiments/lock-3-hunt-v3.md). Everything else is compared against it.
+
 Only results pasted from the PC runs or recorded in the lock files. `results/` and `backend/*.db` are gitignored, so raw trade files and databases are not here. Add new runs below.
 
 All runs: fee 2 bp a side, same-bar stop wins, one position, stop 1.5 ATR, target 2.5 ATR for Hunt. Lock 1 (4h/1h/15m stack) has no numbers in the repo.
 
-## Lock 3 (Hunt V3) across all three files
+## Hunt V3 across all three files
 
 Run 2026-10-03. Each file used its own Hunt run. Total R = trades x avg R (derived).
 
 | File | Book | Trades | Avg R | Max dip | Total R |
 |---|---|---|---|---|---|
 | 2019-21 | Full Hunt | 3620 | +0.108 | -26.6 | +392 |
-| | **Switch** | 1526 | +0.152 | **-40.9** | +231 |
+| | **Hunt V3** | 1526 | +0.152 | **-40.9** | +231 |
 | 2022-25 | Full Hunt | 6427 | +0.124 | -27.9 | +798 |
-| | **Switch** | 2549 | +0.209 | -23.8 | +532 |
+| | **Hunt V3** | 2549 | +0.209 | -23.8 | +532 |
 | 2025-26 | Full Hunt | 1981 | +0.107 | -32.3 | +211 |
-| | **Switch** | 950 | +0.191 | -15.8 | +182 |
+| | **Hunt V3** | 950 | +0.191 | -15.8 | +182 |
 
 Pieces of the switch:
 
@@ -44,31 +46,31 @@ Read:
 
 Hunt is positive on both sides in all three periods.
 
-## Lock 3 on 2022-25, detail
+## Hunt V3 on 2022-25, detail
 
 - By book: Hunt 2294 trades +0.184R dip -18.3; chop 255 trades +0.433R dip -22.95.
 - By side: long 1332 +0.191R dip -36.6; short 1217 +0.227R dip -26.8.
 - Worst months: 2025-05 (-0.20R), 2024-06 (-0.08R), 2023-07 (-0.06R), 2022-04 (-0.10R). Most months positive.
 - Max win streak 9, max loss streak 11.
 
-## Lock 3 on 2025-26, detail
+## Hunt V3 on 2025-26, detail
 
 - Matches lock 3 exactly: 950 trades, +0.1914R, dip -15.76R; Hunt 864 +0.171R, chop 86 +0.393R.
 - Hole window (2026-07-16 to 08-15): 54 trades +0.10R. Hunt 48 trades -0.176R, chop 6 trades +2.32R.
 - Weakest months: 2026-09 (-0.03R), 2025-11 (+0.02R), 2026-01 (+0.05R).
 
-## Lock 3 on 2022-25, by Hunt weather and year
+## Hunt V3 on 2022-25, by Hunt weather and year
 
 Weather is the Hunt weather V1 label (SWING_UP, SWING_DOWN, CHOP). BOX is the chop book. Run with `scripts/diagnose_v3_regime.py`.
 
-| Weather | Full Hunt | Switch |
+| Weather | Full Hunt | Hunt V3 |
 |---|---|---|
 | SWING_UP | 628, +0.113R, dip -27.6 | 344, +0.164R, dip -14.3 |
 | SWING_DOWN | 480, +0.137R, dip -18.5 | 232, +0.281R, dip -10.0 |
 | CHOP weather | 5319, +0.124R, dip -28.5 | 1718, +0.174R, dip -26.4 |
 | BOX (chop book) | - | 255, +0.433R, dip -23.0 |
 
-| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+| Year | Full Hunt | Hunt V3 | Switch Hunt | Switch chop |
 |---|---|---|---|---|
 | 2022 | 1805, +0.154R | 753, +0.233R | 681, +0.233R | 72, +0.237R |
 | 2023 | 1523, +0.116R | 516, +0.312R | 457, +0.265R | 59, +0.679R |
@@ -81,16 +83,16 @@ Read:
 - Positive every year, but fading. The switch Hunt book falls from +0.233R (2022) to +0.087R (2025).
 - In 2025 the switch is no better than plain Hunt per trade (+0.111R vs +0.125R), and total R is 60 vs 159. The box filter helped in 2022-24 and not in 2025. Chop stays positive in 2025 (+0.368R, 46 trades).
 
-## Lock 3 on 2019-21, by Hunt weather and year
+## Hunt V3 on 2019-21, by Hunt weather and year
 
-| Weather | Full Hunt | Switch |
+| Weather | Full Hunt | Hunt V3 |
 |---|---|---|
 | SWING_UP | 358, +0.033R, dip -22.9 | 201, +0.127R, dip -11.0 |
 | SWING_DOWN | 191, -0.066R, dip -29.5 | 81, -0.021R, dip -15.1 |
 | CHOP weather | 3071, +0.128R, dip -22.9 | 1094, +0.127R, dip -21.1 |
 | BOX (chop book) | - | 150, +0.455R, dip -28.5 |
 
-| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+| Year | Full Hunt | Hunt V3 | Switch Hunt | Switch chop |
 |---|---|---|---|---|
 | 2020 | 1747, +0.101R, dip -25.7 | 829, +0.166R, dip -40.9 | 752, +0.140R | 77, +0.421R |
 | 2021 | 1873, +0.115R, dip -26.6 | 697, +0.134R, dip -17.7 | 624, +0.092R | 73, +0.490R |
@@ -102,16 +104,16 @@ Read:
 - The -40.9R dip is in 2020, bigger than either book's own 2020 dip (Hunt -23.7R, chop -28.5R). Both books lost at the same time.
 - 2021: the switch Hunt book (+0.092R) is below plain Hunt (+0.115R), as in 2025.
 
-## Lock 3 on 2025-26, by Hunt weather and year
+## Hunt V3 on 2025-26, by Hunt weather and year
 
-| Weather | Full Hunt | Switch |
+| Weather | Full Hunt | Hunt V3 |
 |---|---|---|
 | SWING_UP | 175, +0.226R, dip -8.0 | 101, +0.312R, dip -10.0 |
 | SWING_DOWN | 156, +0.236R, dip -15.8 | 92, +0.296R, dip -14.4 |
 | CHOP weather | 1650, +0.082R, dip -29.4 | 671, +0.133R, dip -21.9 |
 | BOX (chop book) | - | 86, +0.393R, dip -17.8 |
 
-| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+| Year | Full Hunt | Hunt V3 | Switch Hunt | Switch chop |
 |---|---|---|---|---|
 | 2025 (Sep-Dec) | 572, +0.113R, dip -10.3 | 343, +0.178R, dip -11.9 | 322, +0.164R | 21, +0.400R |
 | 2026 (Jan-Sep) | 1409, +0.104R, dip -32.3 | 607, +0.199R, dip -15.8 | 542, +0.176R | 65, +0.390R |
@@ -135,7 +137,7 @@ Swing swings from negative to the best label. CHOP is steady. Swing trades are o
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
 
-| Variant | Hunt alone | Switch |
+| Variant | Hunt alone | Hunt V3 |
 |---|---|---|
 | Baseline (no Step 8) | 6427, +0.124R, dip -27.9 | 2549, +0.208R, dip -23.8 |
 | room | 6429, +0.126R, dip -28.9 | 2577, +0.197R, dip -24.9 |
@@ -174,23 +176,23 @@ Total R = trades x avg R. R/dip = total R divided by the max dip, so it scales f
 | File | Strategy | Trades | Avg R | Total R | Max dip | R/dip |
 |---|---|---|---|---|---|---|
 | 2019-21 | Plain Hunt | 3620 | +0.108 | +392 | -26.6 | **14.7** |
-| | Lock 3 (V3) | 1526 | +0.152 | +231 | -40.9 | 5.7 |
+| | Hunt V3 | 1526 | +0.152 | +231 | -40.9 | 5.7 |
 | | Swing Hunt + chop | 462 | +0.217 | +100 | -29.3 | 3.4 |
 | 2022-25 | Plain Hunt | 6427 | +0.124 | +798 | -27.9 | **28.7** |
-| | Lock 3 (V3) | 2549 | +0.208 | +531 | -23.8 | 22.3 |
+| | Hunt V3 | 2549 | +0.208 | +531 | -23.8 | 22.3 |
 | | Swing Hunt + chop | 891 | +0.251 | +224 | -24.4 | 9.2 |
 | | V3 + Step 8 (room) | 2577 | +0.197 | +508 | -24.9 | 20.4 |
 | 2025-26 | Plain Hunt | 1981 | +0.106 | +211 | -32.3 | 6.5 |
-| | Lock 3 (V3) | 950 | +0.191 | +182 | -15.8 | **11.5** |
+| | Hunt V3 | 950 | +0.191 | +182 | -15.8 | **11.5** |
 | | Swing Hunt + chop | 288 | +0.422 | +122 | -19.6 | 6.2 |
 
 Read:
-- Lock 3 has the best average per trade of the three whole-engine versions except swing+chop, but plain Hunt makes more total R on every file and a better R/dip on two of three (2019-21, 2022-25).
-- Lock 3 wins only on 2025-26, the file it was locked on. On the two other files it is worse than plain Hunt on R/dip.
+- Hunt V3 has the best average per trade of the three whole-engine versions except swing+chop, but plain Hunt makes more total R on every file and a better R/dip on two of three (2019-21, 2022-25).
+- Hunt V3 wins only on 2025-26, the file it was locked on. On the two other files it is worse than plain Hunt on R/dip.
 - Swing Hunt + chop has the highest avg R and the lowest total R everywhere.
 - Step 8 made V3 slightly worse.
 
-## Lock 3 rule, short
+## Hunt V3 rule, short
 
 - Box off: full desktop Hunt trades, chop does not.
 - Box on: Hunt signal dropped, chop trade only.
