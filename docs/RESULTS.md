@@ -160,6 +160,25 @@ Read:
 - A tighter stop does not help in the same arithmetic (estimated -0.5R stop gives about the same expectancy).
 - Chop: winners take 50-60 hours and reach median 3.6-4.3R; chop losers last 7.5-17 hours. 52-65% of chop losers were +1R up first and 44-53% were +1.5R up, so chop gives back a lot of open profit. Chop win rate is about 19-29%.
 
+## Hunt V3 feature scan (Hunt trades inside Hunt V3, avg R by feature)
+
+Run with `scripts/diagnose_hunt_features.py` on the three files (2019-21, 2022-25, 2025-26). Hunt V3 Hunt trades: 1376, 2294, 864, avg +0.119R, +0.183R, +0.171R.
+
+| Bucket | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| **12-16h UTC** | 260, +0.311R | 516, +0.304R | 212, +0.308R |
+| other hours (best other) | 20-24h +0.204R | 00-04h +0.248R | 08-12h +0.220R |
+| CHoCH / BOS | +0.111 / +0.146 | +0.201 / +0.116 | +0.175 / +0.159 |
+| gate cfast / internal / rearm | +0.182 / +0.111 / +0.112 | +0.235 / +0.242 / +0.156 | +0.005 / +0.282 / +0.162 |
+| vol low / mid / high | +0.134 / +0.041 / +0.181 | +0.042 / +0.186 / +0.323 | +0.257 / +0.102 / +0.155 |
+| side long / short | +0.115 / +0.124 | +0.146 / +0.225 | +0.168 / +0.175 |
+
+Read:
+- Only one bucket has the same sign on all three files: 12-16h UTC (about +0.31R, 0.12-0.19R above each file's average). It is the top hour bucket of six in every file. Chance of that by luck is small (about (1/6)^3 for a given bucket, a few percent for any bucket), but it was found by scanning, so it needs an out-of-sample check.
+- 12-16h is 22% of Hunt V3 Hunt trades (988 of 4534) and about 41% of their total R (about +303R of +731R). The other hours average about +0.12R.
+- Event, gate, weather, side, volatility and weekday: nothing consistent across files.
+- Weak negatives: 04-08h UTC is below average on all three (-0.05, 0.00, +0.15R).
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
