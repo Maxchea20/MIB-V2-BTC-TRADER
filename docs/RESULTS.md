@@ -80,7 +80,28 @@ Read:
 - The switch is positive in all three weather labels and in the box. SWING_DOWN is best (+0.281R, dip -10.0).
 - Positive every year, but fading. The switch Hunt book falls from +0.233R (2022) to +0.087R (2025).
 - In 2025 the switch is no better than plain Hunt per trade (+0.111R vs +0.125R), and total R is 60 vs 159. The box filter helped in 2022-24 and not in 2025. Chop stays positive in 2025 (+0.368R, 46 trades).
-- Weather and year splits for 2019-21 and 2025-26 not run yet.
+- Weather and year split for 2025-26 not run yet.
+
+## Lock 3 on 2019-21, by Hunt weather and year
+
+| Weather | Full Hunt | Switch |
+|---|---|---|
+| SWING_UP | 358, +0.033R, dip -22.9 | 201, +0.127R, dip -11.0 |
+| SWING_DOWN | 191, -0.066R, dip -29.5 | 81, -0.021R, dip -15.1 |
+| CHOP weather | 3071, +0.128R, dip -22.9 | 1094, +0.127R, dip -21.1 |
+| BOX (chop book) | - | 150, +0.455R, dip -28.5 |
+
+| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+|---|---|---|---|---|
+| 2020 | 1747, +0.101R, dip -25.7 | 829, +0.166R, dip -40.9 | 752, +0.140R | 77, +0.421R |
+| 2021 | 1873, +0.115R, dip -26.6 | 697, +0.134R, dip -17.7 | 624, +0.092R | 73, +0.490R |
+
+Read:
+- Swing is weak here. Hunt in SWING_DOWN loses (-0.066R, 191 trades) and SWING_UP is flat (+0.033R). All of Hunt's +392R comes from CHOP weather (+393R). In 2022-25 swing was positive (+0.11R, +0.14R), so swing is not consistent across files.
+- The switch does not fix SWING_DOWN (-0.021R, 81 trades). It lifts SWING_UP to +0.127R.
+- The box chop book is positive again (+0.455R, 150 trades).
+- The -40.9R dip is in 2020, bigger than either book's own 2020 dip (Hunt -23.7R, chop -28.5R). Both books lost at the same time.
+- 2021: the switch Hunt book (+0.092R) is below plain Hunt (+0.115R), as in 2025.
 
 ## Lock 3 rule, short
 
