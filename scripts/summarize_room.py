@@ -18,6 +18,7 @@ def _fmt(b):
 
 def main():
     name = sys.argv[1]
+    only = sys.argv[2] if len(sys.argv) > 2 else None
     base = ROOT / "results" / "lock3"
     if (base / f"{name}_hunt.txt").exists():
         print(f"{name} baseline (no Step 8)")
@@ -25,6 +26,8 @@ def main():
         print("  switch " + _fmt(_load(base / f"{name}_switch.txt")["one_position"]))
     for hunt_path in sorted((ROOT / "results" / "room").glob(f"{name}_*_hunt.txt")):
         variant = hunt_path.name[len(name) + 1:-len("_hunt.txt")]
+        if only and variant != only:
+            continue
         print(variant)
         print("  hunt   " + _fmt(_load(hunt_path)["combined"]))
         print("  switch " + _fmt(_load(hunt_path.with_name(f"{name}_{variant}_switch.txt"))["one_position"]))
