@@ -19,13 +19,11 @@ FIELDS = ("book", "side", "entry", "stop", "target", "exit", "entry_time", "exit
 
 def main():
     db = research_db_path(sys.argv[1] if len(sys.argv) > 1 else None)
-    hunt_files = sorted((ROOT / "results" / "exp-hunt-desktop-cfi-v1").glob("*/trades.csv"))
-    if not hunt_files:
-        raise SystemExit("no full Hunt trades")
-    hunt = list(csv.DictReader(hunt_files[-1].open(encoding="utf-8")))
+    hunt_file = Path(sys.argv[2]) if len(sys.argv) > 2 else sorted((ROOT / "results" / "exp-hunt-desktop-cfi-v1").glob("*/trades.csv"))[-1]
+    hunt = list(csv.DictReader(hunt_file.open(encoding="utf-8")))
     bars, info = load_bars(db, "BTC_USDT", None, None)
     series = resample(bars, "1h")
-    print(f"{db.name} 1h={len(series)} {info.start_ms}..{info.end_ms}")
+    print(f"{db.name} 1h={len(series)} hunt={hunt_file}")
     active = _flags(series)
     chop = _chop(series, active)
     kept = [t for t in hunt if not _on(int(t["entry_time"]), active)]
@@ -39,6 +37,8 @@ def main():
         writer.writeheader()
         writer.writerows(merged)
     print(json.dumps({
+        "db": db.name,
+        "hunt_file": str(hunt_file),
         "hunt": _bucket(hunt),
         "hunt_outside_box": _bucket(kept),
         "chop": _bucket(chop),
@@ -107,8 +107,8 @@ def _walk(trade, series, start):
         trade["exit"] = price
         trade["exit_time"] = bar.open_time
         trade["exit_reason"] = "STOP" if broke else "TARGET"
-        trade["net_pnl"] = gross - (trade["entry"] + price) * 0.0002
-        trade["r_multiple"] = trade["net_pnl"] / trade["risk"]
+        trade["net_pnl"] = trade["net_pnl"] if "net_pnl" in trade and trade.get("book") == "HUNT" else gross - (trade["entry"] + price) * 0.0002
+        trade["r_multiple"] = trade["net_pnl"] / trade["risk"] if trade.get("book") != "HUNT" else float(trade["r_multiple"])
         return trade
     return None
 
