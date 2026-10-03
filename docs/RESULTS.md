@@ -57,6 +57,31 @@ Hunt is positive on both sides in all three periods.
 - Hole window (2026-07-16 to 08-15): 54 trades +0.10R. Hunt 48 trades -0.176R, chop 6 trades +2.32R.
 - Weakest months: 2026-09 (-0.03R), 2025-11 (+0.02R), 2026-01 (+0.05R).
 
+## Lock 3 on 2022-25, by Hunt weather and year
+
+Weather is the Hunt weather V1 label (SWING_UP, SWING_DOWN, CHOP). BOX is the chop book. Run with `scripts/diagnose_v3_regime.py`.
+
+| Weather | Full Hunt | Switch |
+|---|---|---|
+| SWING_UP | 628, +0.113R, dip -27.6 | 344, +0.164R, dip -14.3 |
+| SWING_DOWN | 480, +0.137R, dip -18.5 | 232, +0.281R, dip -10.0 |
+| CHOP weather | 5319, +0.124R, dip -28.5 | 1718, +0.174R, dip -26.4 |
+| BOX (chop book) | - | 255, +0.433R, dip -23.0 |
+
+| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+|---|---|---|---|---|
+| 2022 | 1805, +0.154R | 753, +0.233R | 681, +0.233R | 72, +0.237R |
+| 2023 | 1523, +0.116R | 516, +0.312R | 457, +0.265R | 59, +0.679R |
+| 2024 | 1824, +0.101R | 742, +0.182R | 664, +0.148R | 78, +0.468R |
+| 2025 (to Aug) | 1275, +0.125R | 538, +0.111R | 492, +0.087R | 46, +0.368R |
+
+Read:
+- Hunt is about +0.12R in every weather label. 83% of Hunt trades are CHOP weather and only 17% are swing, so swing is a small sample here (480 and 628 trades).
+- The switch is positive in all three weather labels and in the box. SWING_DOWN is best (+0.281R, dip -10.0).
+- Positive every year, but fading. The switch Hunt book falls from +0.233R (2022) to +0.087R (2025).
+- In 2025 the switch is no better than plain Hunt per trade (+0.111R vs +0.125R), and total R is 60 vs 159. The box filter helped in 2022-24 and not in 2025. Chop stays positive in 2025 (+0.368R, 46 trades).
+- Weather and year splits for 2019-21 and 2025-26 not run yet.
+
 ## Lock 3 rule, short
 
 - Box off: full desktop Hunt trades, chop does not.
