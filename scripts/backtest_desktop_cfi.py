@@ -21,13 +21,18 @@ FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit",
 def main():
     args = sys.argv[1:]
     trail = "trail-1atr" in args
-    paths = [a for a in args if a != "trail-1atr"] or [None]
+    room = "room-ex" if "room-ex" in args else ("room" if "room" in args else None)
+    block = "room-block" in args
+    flags = ("trail-1atr", "room", "room-ex", "room-block")
+    paths = [a for a in args if a not in flags] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
+        if room:
+            name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -36,11 +41,13 @@ def main():
             writer.writerows(trades)
         row = _score(db.name, trades)
         row["trail_1atr"] = trail
+        row["room"] = room
+        row["room_block"] = block
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -62,7 +69,9 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail):
         side, event, gate = _gate(fast, internal, j15)
         if not side:
             continue
-        flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs_4h)
+        flag = _weather(bars_4h[:j4], bars_1h[:j1], atrs_4h, room)
+        if flag == "CHOP_VETO" and block:
+            continue
         if flag == "SWING_UP" and side != "LONG":
             continue
         if flag == "SWING_DOWN" and side != "SHORT":
@@ -157,7 +166,7 @@ def _answers(side, level, live, slot, atr):
     return False
 
 
-def _weather(rows, rows_1h, atrs):
+def _weather(rows, rows_1h, atrs, room=None):
     atr = atrs[len(rows) - 1]
     old = atrs[len(rows) - 11] if len(rows) >= 24 else None
     opening = bool(atr and old and old > 0 and atr / old >= 1.4)
@@ -175,6 +184,12 @@ def _weather(rows, rows_1h, atrs):
         u1, d1 = _votes(rows_1h)
         if (flag == "SWING_UP" and d1 >= 5) or (flag == "SWING_DOWN" and u1 >= 5):
             flag = "CHOP"
+    if room and flag != "CHOP" and atr:
+        window = rows[-7:] if room == "room" else rows[-7:-1]
+        close = rows[-1].close
+        gap = max(b.high for b in window) - close if flag == "SWING_UP" else close - min(b.low for b in window)
+        if gap < 0.25 * atr:
+            flag = "CHOP_VETO"
     return flag
 
 
