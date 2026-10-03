@@ -131,6 +131,24 @@ Read:
 
 Swing swings from negative to the best label. CHOP is steady. Swing trades are only 15-17% of the book in every file, so the swing numbers are noisy.
 
+## Step 8 room-to-run veto test, 2022-25
+
+Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
+
+| Variant | Hunt alone | Switch |
+|---|---|---|
+| Baseline (no Step 8) | 6427, +0.124R, dip -27.9 | 2549, +0.208R, dip -23.8 |
+| room | 6429, +0.126R, dip -28.9 | 2577, +0.197R, dip -24.9 |
+| room-ex | 6498, +0.123R, dip -28.9 | 2623, +0.186R, dip -31.2 |
+| room-block | 6324, +0.121R, dip -30.9 | 2491, +0.203R, dip -26.6 |
+| room-ex-block | 6276, +0.116R, dip -35.8 | 2463, +0.195R, dip -32.4 |
+
+Read:
+- Step 8 does not help on 2022-25. Every variant is at or below baseline on the switch, and every dip is worse.
+- The blocked trades were good ones. Blocking removes 103 trades (room-block) and 151 trades (room-ex-block) worth about +33R and +70R (about +0.32R and +0.47R each, approximate because the trade sequence shifts). Swings near the recent high or low tend to keep going.
+- Letting a vetoed swing become CHOP (both sides) adds trades but lowers the average.
+- Only 2022-25 tested. 2019-21 and 2025-26 not run.
+
 ## Lock 3 rule, short
 
 - Box off: full desktop Hunt trades, chop does not.
