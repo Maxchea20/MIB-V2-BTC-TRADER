@@ -149,6 +149,18 @@ Read:
 - Letting a vetoed swing become CHOP (both sides) adds trades but lowers the average.
 - Only 2022-25 tested. 2019-21 and 2025-26 not run.
 
+## Doc steps 1-9 in full: swing-only Hunt + box chop
+
+Hunt only in SWING_UP / SWING_DOWN weather, chop only in the box, nothing else. Uses the saved Hunt file (no new Hunt run). Run with `scripts/run_swing_only.py`. The doc's "Chop Engine" is not defined, so the box chop book stands in for it.
+
+| File | Swing Hunt (all) | Chop (all) | Combined, one position | Total R |
+|---|---|---|---|---|
+| 2025-26 | 331, +0.231R, dip -15.0 | 114, +0.580R, dip -16.8 | 288 (Hunt 177 / chop 111), +0.422R, dip -19.6 | +122 |
+| 2022-25 | not run | | | |
+| 2019-21 | not run | | | |
+
+2025-26 read: per-trade average doubles (+0.422R vs +0.191R for the switch), but total R falls to +122 against +182 (switch) and +211 (plain Hunt), because only 288 trades are taken. Dip -19.6R is worse than the switch (-15.8R) and better than plain Hunt (-32.3R). 2025-26 is the file where swing was strongest (+0.23R); in 2019-21 swing lost money, so that file is the real test.
+
 ## Lock 3 rule, short
 
 - Box off: full desktop Hunt trades, chop does not.
