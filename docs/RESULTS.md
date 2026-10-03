@@ -157,7 +157,11 @@ Hunt only in SWING_UP / SWING_DOWN weather, chop only in the box, nothing else. 
 |---|---|---|---|---|
 | 2025-26 | 331, +0.231R, dip -15.0 | 114, +0.580R, dip -16.8 | 288 (Hunt 177 / chop 111), +0.422R, dip -19.6 | +122 |
 | 2022-25 | 1108, +0.124R, dip -19.9 | 347, +0.593R, dip -31.2 | 891 (Hunt 568 / chop 323), +0.251R, dip -24.4 | +224 |
-| 2019-21 | not run | | | |
+| 2019-21 | 549, -0.002R, dip -36.2 | 201, +0.393R, dip -26.4 | 462 (Hunt 273 / chop 189), +0.217R, dip -29.3 | +100 |
+
+2019-21 read: swing Hunt on its own is flat (-0.002R, dip -36.2R), so the +0.217R comes mostly from chop (about 189 trades at roughly +0.39R is about +74R of the +100R, approximate). Dip -29.3R is better than the switch (-40.9R) and a bit worse than plain Hunt (-26.6R).
+
+Across all three files, per trade (swing-only vs switch vs plain Hunt): 2019-21 +0.217 / +0.152 / +0.108; 2022-25 +0.251 / +0.208 / +0.124; 2025-26 +0.422 / +0.191 / +0.107. Total R: 100 / 224 / 122 against switch 231 / 532 / 182, so it keeps only about 40-65% of the switch's total R. Positive on every file.
 
 2022-25 read: per trade +0.251R beats the switch (+0.208R) but total R is +224 against +532 (switch) and +798 (plain Hunt). Dip -24.4R is about the same as the switch (-23.8R). Chop is 323 of the 891 trades, so about 36% of the book.
 
