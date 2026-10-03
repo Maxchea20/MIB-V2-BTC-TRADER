@@ -1,42 +1,61 @@
 # Backtest results log
 
-Only results recorded in the repo lock files. `results/` and `backend/*.db` are gitignored, so raw trade files and the research database are not here. Add new runs below as they are made.
+Only results pasted from the PC runs or recorded in the lock files. `results/` and `backend/*.db` are gitignored, so raw trade files and databases are not here. Add new runs below.
 
-All runs: `research_binance.db`, fee 2 bp a side, same-bar stop wins, one position.
+All runs: fee 2 bp a side, same-bar stop wins, one position, stop 1.5 ATR, target 2.5 ATR for Hunt. Lock 1 (4h/1h/15m stack) has no numbers in the repo.
 
-| Book | Data | Trades | Avg R | PF | Max dip | Notes |
-|---|---|---|---|---|---|---|
-| Lock 1: 4h/1h/15m stack | not recorded | - | - | - | - | No numbers in the repo |
-| Lock 2: desktop Hunt C-FI (stop 1.5 ATR, target 2.5 ATR) | Sep 2025 - Sep 2026 | 1981 | +0.107R | 1.22 | -32.3R | Both sides positive. Source: `config/experiments/lock-2-hunt-cfi.md` |
-| Lock 3: Hunt V3 (1h failed-push box switch), one position | 2025-26 | 950 (Hunt 864, chop 86) | +0.191R | - | -15.8R | $50 risk: $9.57 a trade, $9,092 on the year, $788 dip. Source: `config/experiments/lock-3-hunt-v3.md` |
+## Lock 3 (Hunt V3) across all three files
 
-## 2019-21 run (research_2019_21.db, run 2026-10-03)
+Run 2026-10-03. Each file used its own Hunt run. Total R = trades x avg R (derived).
 
-Desktop Hunt C-FI on its own (`backtest_desktop_cfi.py`, file `exp-hunt-desktop-cfi-v1/20261003T024202Z`):
+| File | Book | Trades | Avg R | Max dip | Total R |
+|---|---|---|---|---|---|
+| 2019-21 | Full Hunt | 3620 | +0.108 | -26.6 | +392 |
+| | **Switch** | 1526 | +0.152 | **-40.9** | +231 |
+| 2022-25 | Full Hunt | 6427 | +0.124 | -27.9 | +798 |
+| | **Switch** | 2549 | +0.209 | -23.8 | +532 |
+| 2025-26 | Full Hunt | 1981 | +0.107 | -32.3 | +211 |
+| | **Switch** | 950 | +0.191 | -15.8 | +182 |
 
-| Side | Trades | Avg R | PF | Max dip | Stops | Targets |
-|---|---|---|---|---|---|---|
-| Combined | 3620 | +0.1082R | 1.178 | -26.59R | 2035 | 1585 |
-| LONG | 1962 | +0.1255R | 1.141 | -22.89R | 1090 | 872 |
-| SHORT | 1658 | +0.0877R | 1.221 | -26.60R | 945 | 713 |
+Pieces of the switch:
 
-Hunt stays positive on 2019-21, so lock 2 holds out of sample on both sides.
-
-Lock 3 switch (`backtest_hunt_chop.py`, matching Hunt file `20261003T024202Z`):
-
-| Book | Trades | Avg R | Max dip | Total R |
+| File | Hunt outside box | Hunt inside box (dropped) | Chop alone | Switch Hunt / chop trades |
 |---|---|---|---|---|
-| Full Hunt | 3620 | +0.1082R | -26.59R | +392 |
-| Hunt outside the box | 1904 | +0.1258R | -21.72R | +240 |
-| Hunt inside the box (dropped by the switch) | 1716 | +0.089R | - | +152 |
-| Chop alone | 201 | +0.3928R | -26.38R | +79 |
-| **Switch, one position** | 1526 (Hunt 1376, chop 150) | +0.1516R | **-40.89R** | +231 |
+| 2019-21 | 1904, +0.126R, dip -21.7 | 1716, +0.089R | 201, +0.393R, dip -26.4 | 1376 / 150 |
+| 2022-25 | 2867, +0.193R, dip -18.9 | 3560, +0.069R | 347, +0.593R, dip -31.2 | 2294 / 255 |
+| 2025-26 | 1007, +0.152R, dip -20.5 | 974, +0.060R | 114, +0.580R, dip -16.8 | 864 / 86 |
 
-Total R and the inside-box line are derived (trades x avg R), not printed by the script.
+Read:
+- Avg R per trade rises on every file (about +0.08R).
+- Total R falls on every file (-41%, -33%, -14%). The switch trades half as often.
+- Max dip is better on two files and clearly worse on 2019-21 (-40.9 vs -26.6). The halved dip on 2025-26 is not typical.
+- Hunt inside the box is still positive on all three files (+0.06 to +0.09R) but weaker than outside (+0.13 to +0.19R). Dropping it raises quality and costs total R.
+- Chop alone is positive on all three files (+0.39, +0.59, +0.58R). In the switch (2022-25) chop made +0.433R on 255 trades but hit its target only 52 times to 203 stops, so it lives on a few big wins.
+- One-position blocking removes a lot: chop goes 201 to 150, 347 to 255, 114 to 86; Hunt outside-box trades shrink 1904 to 1376, 2867 to 2294.
+- Max loss streak in the switch: 11 on 2022-25 and on 2025-26.
 
-Read: the switch lifts the average per trade (+0.108R to +0.152R) but it does not hold up as lock 3 claimed. Max dip is worse, -40.9R against -26.6R for plain Hunt, where 2025-26 had it halved. Total R falls about 41%. The box drops Hunt trades that are still positive on this file (+0.089R). One-position blocking costs a lot: 1904 outside-box Hunt trades shrink to 1376, and 51 of the 201 chop trades are lost to overlap. Chop alone is strong here (+0.39R), but its dip is -26.4R on 201 trades.
+## Hunt alone (lock 2)
 
-An earlier run of the same script (chop 201, one-position 2182 trades, +0.1329R) mixed in the 2025-26 Hunt file and is invalid.
+| File | Trades | Avg R | PF | Max dip | Long avg R | Short avg R |
+|---|---|---|---|---|---|---|
+| 2019-21 | 3620 | +0.108 | 1.178 | -26.6 | +0.126 | +0.088 |
+| 2022-25 | 6427 | +0.124 | 1.245 | -27.9 | +0.117 | +0.132 |
+| 2025-26 | 1981 | +0.107 | 1.224 | -32.3 | +0.104 | +0.109 |
+
+Hunt is positive on both sides in all three periods.
+
+## Lock 3 on 2022-25, detail
+
+- By book: Hunt 2294 trades +0.184R dip -18.3; chop 255 trades +0.433R dip -22.95.
+- By side: long 1332 +0.191R dip -36.6; short 1217 +0.227R dip -26.8.
+- Worst months: 2025-05 (-0.20R), 2024-06 (-0.08R), 2023-07 (-0.06R), 2022-04 (-0.10R). Most months positive.
+- Max win streak 9, max loss streak 11.
+
+## Lock 3 on 2025-26, detail
+
+- Matches lock 3 exactly: 950 trades, +0.1914R, dip -15.76R; Hunt 864 +0.171R, chop 86 +0.393R.
+- Hole window (2026-07-16 to 08-15): 54 trades +0.10R. Hunt 48 trades -0.176R, chop 6 trades +2.32R.
+- Weakest months: 2026-09 (-0.03R), 2025-11 (+0.02R), 2026-01 (+0.05R).
 
 ## Lock 3 rule, short
 
@@ -44,14 +63,14 @@ An earlier run of the same script (chop 201, one-position 2182 trades, +0.1329R)
 - Box on: Hunt signal dropped, chop trade only.
 - Chop entry: reject of a line, or a turn in the outer quarter before the line is touched.
 - Chop stop: a close through the entry line (a wick is not a stop). Target: the other line.
-- Chop fee 2 bp a side. The Hunt file is used as recorded.
+- One position. Chop fee 2 bp a side. The Hunt file is used as recorded.
 
 ## Rejected
 
 - Chop line-touch fade and quarter fade: both lost.
 - Chop middle target: not in the lock.
+- Invalid run: `backtest_hunt_chop.py` on 2019-21 with the 2025-26 Hunt file (2182 trades, +0.1329R). Ignore it.
 
 ## Not yet tested
 
-- Lock 3 on 2022-25.
-- Lock 2 on 2022-25.
+- Lock 1 numbers. Chop-only book. Hunt and chop both open at once (no one-position rule).
