@@ -133,6 +133,33 @@ Read:
 
 Swing swings from negative to the best label. CHOP is steady. Swing trades are only 15-17% of the book in every file, so the swing numbers are noisy.
 
+## Hunt V3 trade path (how far trades go before they end)
+
+Run with `scripts/diagnose_v3_path.py`. R = stop distance. For Hunt, 1 ATR in favor = +0.67R. The exit bar is left out. Reached-share is the share of trades that were at that level at some point before ending.
+
+| File | Hunt stopped | Hunt target | Stopped that reached +0.67R | Winners dipped past -0.5R / -0.8R |
+|---|---|---|---|---|
+| 2025-26 | 455 | 397 | 49% | 25% / 7% |
+| 2022-25 | 1209 | 1050 | 48% | 27% / 10% |
+| 2019-21 | 769 | 588 | 47% | 30% / 11% |
+
+Median MFE/MAE: Hunt winners MFE 1.54-1.55R, MAE 0.20-0.25R. Hunt losers MFE 0.63-0.65R. Median time about 100-130 minutes for both.
+
+Derived odds (approximate, from the counts above), compared with a coin flip at the same distances:
+
+| File | Reach +1 ATR before stop | Coin flip | Target given +1 ATR reached | Coin flip |
+|---|---|---|---|---|
+| 2025-26 | 72% | 60% | 64% | 62.5% |
+| 2022-25 | 72% | 60% | 65% | 62.5% |
+| 2019-21 | 69% | 60% | 63% | 62.5% |
+
+Read:
+- Hunt entries have an edge in the first 1 ATR (69-72% against 60%). After +1 ATR reached, the trade behaves like a coin flip (63-65% against 62.5%).
+- About half of stopped Hunt trades were +1 ATR up first, but moving the stop to break-even there would not add expectancy by itself in a coin-flip walk. It only lowers the dip.
+- Winners barely dip (median 0.2R), so entry timing works when the trade works. About 28% of trades go straight against and never reach +1 ATR.
+- A tighter stop does not help in the same arithmetic (estimated -0.5R stop gives about the same expectancy).
+- Chop: winners take 50-60 hours and reach median 3.6-4.3R; chop losers last 7.5-17 hours. 52-65% of chop losers were +1R up first and 44-53% were +1.5R up, so chop gives back a lot of open profit. Chop win rate is about 19-29%.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
