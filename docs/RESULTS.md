@@ -167,6 +167,29 @@ Across all three files, per trade (swing-only vs switch vs plain Hunt): 2019-21 
 
 2025-26 read: per-trade average doubles (+0.422R vs +0.191R for the switch), but total R falls to +122 against +182 (switch) and +211 (plain Hunt), because only 288 trades are taken. Dip -19.6R is worse than the switch (-15.8R) and better than plain Hunt (-32.3R). 2025-26 is the file where swing was strongest (+0.23R); in 2019-21 swing lost money, so that file is the real test.
 
+## Side by side: every strategy tested (2026-10-03)
+
+Total R = trades x avg R. R/dip = total R divided by the max dip, so it scales for risk.
+
+| File | Strategy | Trades | Avg R | Total R | Max dip | R/dip |
+|---|---|---|---|---|---|---|
+| 2019-21 | Plain Hunt | 3620 | +0.108 | +392 | -26.6 | **14.7** |
+| | Lock 3 (V3) | 1526 | +0.152 | +231 | -40.9 | 5.7 |
+| | Swing Hunt + chop | 462 | +0.217 | +100 | -29.3 | 3.4 |
+| 2022-25 | Plain Hunt | 6427 | +0.124 | +798 | -27.9 | **28.7** |
+| | Lock 3 (V3) | 2549 | +0.208 | +531 | -23.8 | 22.3 |
+| | Swing Hunt + chop | 891 | +0.251 | +224 | -24.4 | 9.2 |
+| | V3 + Step 8 (room) | 2577 | +0.197 | +508 | -24.9 | 20.4 |
+| 2025-26 | Plain Hunt | 1981 | +0.106 | +211 | -32.3 | 6.5 |
+| | Lock 3 (V3) | 950 | +0.191 | +182 | -15.8 | **11.5** |
+| | Swing Hunt + chop | 288 | +0.422 | +122 | -19.6 | 6.2 |
+
+Read:
+- Lock 3 has the best average per trade of the three whole-engine versions except swing+chop, but plain Hunt makes more total R on every file and a better R/dip on two of three (2019-21, 2022-25).
+- Lock 3 wins only on 2025-26, the file it was locked on. On the two other files it is worse than plain Hunt on R/dip.
+- Swing Hunt + chop has the highest avg R and the lowest total R everywhere.
+- Step 8 made V3 slightly worse.
+
 ## Lock 3 rule, short
 
 - Box off: full desktop Hunt trades, chop does not.
