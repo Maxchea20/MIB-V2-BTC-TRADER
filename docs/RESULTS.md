@@ -80,7 +80,6 @@ Read:
 - The switch is positive in all three weather labels and in the box. SWING_DOWN is best (+0.281R, dip -10.0).
 - Positive every year, but fading. The switch Hunt book falls from +0.233R (2022) to +0.087R (2025).
 - In 2025 the switch is no better than plain Hunt per trade (+0.111R vs +0.125R), and total R is 60 vs 159. The box filter helped in 2022-24 and not in 2025. Chop stays positive in 2025 (+0.368R, 46 trades).
-- Weather and year split for 2025-26 not run yet.
 
 ## Lock 3 on 2019-21, by Hunt weather and year
 
@@ -102,6 +101,35 @@ Read:
 - The box chop book is positive again (+0.455R, 150 trades).
 - The -40.9R dip is in 2020, bigger than either book's own 2020 dip (Hunt -23.7R, chop -28.5R). Both books lost at the same time.
 - 2021: the switch Hunt book (+0.092R) is below plain Hunt (+0.115R), as in 2025.
+
+## Lock 3 on 2025-26, by Hunt weather and year
+
+| Weather | Full Hunt | Switch |
+|---|---|---|
+| SWING_UP | 175, +0.226R, dip -8.0 | 101, +0.312R, dip -10.0 |
+| SWING_DOWN | 156, +0.236R, dip -15.8 | 92, +0.296R, dip -14.4 |
+| CHOP weather | 1650, +0.082R, dip -29.4 | 671, +0.133R, dip -21.9 |
+| BOX (chop book) | - | 86, +0.393R, dip -17.8 |
+
+| Year | Full Hunt | Switch | Switch Hunt | Switch chop |
+|---|---|---|---|---|
+| 2025 (Sep-Dec) | 572, +0.113R, dip -10.3 | 343, +0.178R, dip -11.9 | 322, +0.164R | 21, +0.400R |
+| 2026 (Jan-Sep) | 1409, +0.104R, dip -32.3 | 607, +0.199R, dip -15.8 | 542, +0.176R | 65, +0.390R |
+
+Read:
+- Swing is strong here (+0.23R full Hunt, +0.30R in the switch), the opposite of 2019-21. Swing is 17% of Hunt trades.
+- CHOP weather is the weakest Hunt label (+0.082R), and the switch lifts it to +0.133R.
+- The switch beats plain Hunt in both years, per trade and on dip.
+
+## Weather across all three files (full Hunt, avg R)
+
+| Weather | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| SWING_UP | +0.033 (358) | +0.113 (628) | +0.226 (175) |
+| SWING_DOWN | -0.066 (191) | +0.137 (480) | +0.236 (156) |
+| CHOP | +0.128 (3071) | +0.124 (5319) | +0.082 (1650) |
+
+Swing swings from negative to the best label. CHOP is steady. Swing trades are only 15-17% of the book in every file, so the swing numbers are noisy.
 
 ## Lock 3 rule, short
 
