@@ -21,6 +21,9 @@ def main():
     db = research_db_path(sys.argv[1] if len(sys.argv) > 1 else None)
     hunt_file = Path(sys.argv[2]) if len(sys.argv) > 2 else sorted((ROOT / "results" / "exp-hunt-desktop-cfi-v1").glob("*/trades.csv"))[-1]
     hunt = list(csv.DictReader(hunt_file.open(encoding="utf-8")))
+    swing_only = "swing-only" in sys.argv[3:]
+    if swing_only:
+        hunt = [t for t in hunt if t["weather"] in ("SWING_UP", "SWING_DOWN")]
     bars, info = load_bars(db, "BTC_USDT", None, None)
     series = resample(bars, "1h")
     print(f"{db.name} 1h={len(series)} hunt={hunt_file}")
@@ -30,7 +33,7 @@ def main():
     for trade in kept:
         trade["book"] = "HUNT"
     merged = _one_position(kept, chop)
-    folder = ROOT / "results" / "exp-hunt-chop-arbiter" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    folder = ROOT / "results" / ("exp-hunt-chop-swing" if swing_only else "exp-hunt-chop-arbiter") / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder.mkdir(parents=True, exist_ok=True)
     with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, FIELDS, extrasaction="ignore")
@@ -39,6 +42,7 @@ def main():
     print(json.dumps({
         "db": db.name,
         "hunt_file": str(hunt_file),
+        "swing_only": swing_only,
         "hunt": _bucket(hunt),
         "hunt_outside_box": _bucket(kept),
         "chop": _bucket(chop),
