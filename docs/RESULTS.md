@@ -2,6 +2,8 @@
 
 Baseline: Hunt V3 (config/experiments/lock-3-hunt-v3.md). Everything else is compared against it.
 
+**Correction (2026-10-04):** every Hunt V3 number below that used the box state (Hunt V3, "Hunt outside box", "Hunt inside box", the floors-in-the-engine Hunt V3 rows, and the box splits in the drawdown diagnosis) peeked at the 1h bar still forming, up to 1 hour of future. The fixed numbers are in the section "Box filter correction". Results that do not use the box (plain Hunt, the chop book, exits, floors on Hunt alone, throttle on all Hunt trades) are not affected.
+
 Only results pasted from the PC runs or recorded in the lock files. `results/` and `backend/*.db` are gitignored, so raw trade files and databases are not here. Add new runs below.
 
 All runs: fee 2 bp a side, same-bar stop wins, one position, stop 1.5 ATR, target 2.5 ATR for Hunt. Lock 1 (4h/1h/15m stack) has no numbers in the repo.
@@ -384,6 +386,26 @@ Read:
 - Outside the box, trades are better (+0.12 to +0.16R vs +0.09 to +0.11R inside) and the drop is smaller, but total R is about half. Inside-box trades hold the worst drop on 2022-25 (-47R).
 - Hunt alone + floors + throttle vs Hunt V3 + floors (R/dip): 21.3 vs 9.4, 34.7 vs 36.1, 14.5 vs 10.7. It earns about 1.5-2x the profit.
 - At $50 risk, per year, Hunt alone + floors + throttle: about $11,850 / $14,650 / $13,500 with worst drops $1,110 / $1,550 / $1,005.
+
+## Box filter correction (closed 1h bars only)
+
+The Hunt V3 filter read the box state of the 1h bar that contains the entry, which is not finished. Fixed to use the last closed 1h bar (what you see live). Run with `scripts/run_box_lag_check.py`, Hunt V3 Hunt file (no floors).
+
+| File | Reading | Hunt outside the box | Hunt V3 |
+|---|---|---|---|
+| 2025-26 | old (peeks) | 1007, +0.151, +153R, dip -20.5, R/dip 7.5 | 950, +0.191, +182R, dip -15.8, 11.5 |
+| | fixed | 977, +0.119, +117R, dip -23.2, 5.0 | 954, +0.169, +161R, dip -16.6, 9.7 |
+| 2019-21 | old | 1904, +0.126, +240R, dip -21.7, 11.0 | 1526, +0.152, +231R, dip -40.9, 5.7 |
+| | fixed | 1886, +0.096, +182R, dip -29.7, 6.1 | 1560, +0.112, +174R, dip -54.4, 3.2 |
+| 2022-25 | old | 2867, +0.193, +552R, dip -18.9, 29.2 | 2549, +0.208, +531R, dip -23.8, 22.3 |
+| | fixed | 2808, +0.169, +475R, dip -22.7, 21.0 | 2602, +0.200, +520R, dip -21.9, 23.7 |
+
+Read:
+- The peek flattered the box filter. Hunt outside the box loses 0.024-0.032R per trade when fixed. Hunt V3 total R falls 12%, 25% and 2%; the 2019-21 dip gets worse (-40.9 to -54.4R).
+- Fixed outside-box Hunt vs plain Hunt (avg R, 2019-21 / 2022-25 / 2025-26): +0.096 vs +0.108, +0.169 vs +0.124, +0.119 vs +0.106. The box filter helps only on 2022-25.
+- Fixed Hunt V3 at $50 risk per year: about $4,350 / $7,100 / $7,450, with worst drops $2,720 / $1,095 / $830.
+- Not affected: Hunt alone with floors (+536R, +1156R, +325R) and Hunt alone with floors and throttle (+474R, +1074R, +292R; dips -22.2, -31.0, -20.1). Hunt alone + floors + throttle is now ahead of Hunt V3 on every file.
+- The lock file `config/experiments/lock-3-hunt-v3.md` still shows the old 2025-26 numbers (950 trades, +0.191R, dip -15.8R). Corrected: 954 trades, +0.169R, dip -16.6R.
 
 ## Step 8 room-to-run veto test, 2022-25
 
