@@ -250,6 +250,22 @@ Read:
 - Chop is consistent across all three files: after a chop SL (close through the line) price kept going past it about 2.4-2.9R, about twice the bounce back (1.1-1.3R), and the target was reached only 3-5% of the time. After a chop TP the move continued 1.0-2.0R and only 12-22% came back to entry. Chop stops look like real breakouts.
 - In ATR, the Hunt swing run is stable across eras (median about 1.3-1.4 ATR, p90 about 3.7-4.2 ATR). Price distances grow with BTC's price level.
 
+## Breakout trade after a chop stop (2025-26 only)
+
+Run with `scripts/run_breakout_test.py`. After a chop trade is stopped by a close through the line, trade the break direction, entry at the next 1h open, one position with Hunt V3.
+
+| Breakout TP/SL set | Breakout alone | Hunt V3 + it |
+|---|---|---|
+| (Hunt V3 baseline) | | 950, +0.191R, total +182, dip -15.8 |
+| ATR: stop 1.5 ATR, target 2.5 ATR (1h ATR) | 81, -0.121R, total -10, dip -16.1 | 926, +0.189R, total +175, dip -16.6 (54 taken) |
+| Line stop, target 2R | 81, -0.299R, total -24, dip -29.8 | 945, +0.179R, total +169, dip -18.2 (62 taken) |
+| Line stop, 1R trail, no target | 81, -0.803R, total -65, dip -72.7 | 986, +0.136R, total +134, dip -22.3 (65 taken) |
+
+Read:
+- All three breakout versions lose on their own and make Hunt V3 worse. The idea does not work on this file.
+- The 24h after-SL study (price kept going about 2.4-2.9R past the chop stop, twice the bounce) was a maximum-excursion measure with no stop and no entry delay. Once the trade enters after the break candle closes and has a stop, the edge is gone.
+- Not run on 2019-21 or 2022-25. Three losing versions on one file is not a reason to spend more runs.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
