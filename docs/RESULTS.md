@@ -1,6 +1,6 @@
 # Backtest results log
 
-Baseline: Hunt V3 (config/experiments/lock-3-hunt-v3.md). Everything else is compared against it.
+Baseline: Hunt V3 (config/experiments/lock-3-hunt-v3.md). Everything else is compared against it. Names and a one-table summary of every version: docs/VERSIONS.md.
 
 **Correction (2026-10-04):** every Hunt V3 number below that used the box state (Hunt V3, "Hunt outside box", "Hunt inside box", the floors-in-the-engine Hunt V3 rows, and the box splits in the drawdown diagnosis) peeked at the 1h bar still forming, up to 1 hour of future. The fixed numbers are in the section "Box filter correction". Results that do not use the box (plain Hunt, the chop book, exits, floors on Hunt alone, throttle on all Hunt trades) are not affected.
 
