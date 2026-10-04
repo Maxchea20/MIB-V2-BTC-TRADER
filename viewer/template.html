@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Hunt trade viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{--bg:#0d1117;--panel:#161b22;--line:#30363d;--text:#c9d1d9;--mut:#8b949e;--g:#26a69a;--r:#ef5350;--acc:#58a6ff}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:13px/1.4 -apple-system,"Segoe UI",Roboto,sans-serif}
+#app{display:flex;height:100%}
+#main{flex:1;display:flex;flex-direction:column;min-width:0}
+#bar{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+#bar .grp{display:flex;gap:4px;align-items:center}
+#bar label{color:var(--mut);font-size:12px}
+button,select,input{background:#21262d;color:var(--text);border:1px solid var(--line);border-radius:5px;padding:4px 8px;font:inherit}
+button{cursor:pointer}
+button.on{background:var(--acc);border-color:var(--acc);color:#04111f;font-weight:600}
+button:hover{border-color:var(--acc)}
+input[type=text]{width:140px}
+input[type=number]{width:64px}
+#chartwrap{position:relative;flex:1;min-height:0}
+#chart{position:absolute;inset:0}
+#ov{position:absolute;inset:0;pointer-events:none;z-index:4}
+#tip{position:absolute;left:10px;top:10px;z-index:5;background:rgba(22,27,34,.92);border:1px solid var(--line);border-radius:6px;padding:6px 9px;pointer-events:none;display:none;max-width:420px;font-size:12px}
+#tip b{color:#fff}
+#side{width:390px;display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel);min-height:0}
+#stats{padding:8px 10px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
+#stats div span{color:var(--mut)}
+#tablewrap{flex:1;overflow:auto;min-height:0}
+table{border-collapse:collapse;width:100%;font-size:12px}
+th{position:sticky;top:0;background:#1c2128;text-align:left;padding:5px 6px;color:var(--mut);font-weight:600}
+td{padding:4px 6px;border-top:1px solid #21262d;white-space:nowrap}
+tr.row{cursor:pointer}
+tr.row:hover{background:#1c2128}
+tr.sel{background:#0f2a44}
+.w{color:var(--g)}.l{color:var(--r)}
+#foot{padding:6px 10px;color:var(--mut);font-size:11px;border-top:1px solid var(--line)}
+#foot a{color:var(--acc)}
+#note{padding:6px 10px;color:var(--mut);font-size:12px;border-bottom:1px solid var(--line)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="main">
+    <div id="bar">
+      <div class="grp"><label>Timeframe</label><button data-tf="5m">5m</button><button data-tf="15m">15m</button><button data-tf="1h">1h</button></div>
+      <div class="grp"><label>Time</label><select id="tz"><option value="8">UTC+8</option><option value="0">UTC</option></select></div>
+      <div class="grp"><label>Go to</label><input id="goto" type="text" placeholder="2026-08-31 07:05"><button id="gobtn">Go</button></div>
+      <div class="grp"><label>Show</label>
+        <select id="fside"><option value="">both sides</option><option value="1">long</option><option value="-1">short</option></select>
+        <select id="fres"><option value="">wins + losses</option><option value="w">wins</option><option value="l">losses</option></select>
+        <select id="fbook"><option value="">all books</option></select>
+        <select id="fwhy"><option value="">all exits</option></select>
+      </div>
+      <div class="grp"><label>From</label><input id="dfrom" type="text" placeholder="yyyy-mm-dd"><label>to</label><input id="dto" type="text" placeholder="yyyy-mm-dd"></div>
+      <div class="grp"><label>Risk $</label><input id="risk" type="number" value="50" min="1"></div>
+    </div>
+    <div id="chartwrap"><div id="chart"></div><canvas id="ov"></canvas><div id="tip"></div></div>
+  </div>
+  <div id="side">
+    <div id="note"></div>
+    <div id="stats"></div>
+    <div id="tablewrap"><table><thead><tr><th>Entry</th><th>Side</th><th>Entry px</th><th>SL</th><th>TP</th><th>R</th><th>Exit</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div id="foot">Arrow keys: previous / next trade. Click a row or a trade box. Green box = distance to TP, red box = distance to SL, dot = real exit.
+    Charts by <a href="https://www.tradingview.com/lightweight-charts/" target="_blank" rel="noopener">TradingView Lightweight Charts&trade;</a> (Apache-2.0).</div>
+  </div>
+</div>
+<script>/*VENDOR*/</script>
+<script type="application/json" id="data">/*DATA*/</script>
+<script>
+(function () {
+  const D = JSON.parse(document.getElementById('data').textContent);
+  const TFS = { '5m': 300, '15m': 900, '1h': 3600 };
+  const $ = (id) => document.getElementById(id);
+  const wrap = $('chartwrap'), cv = $('ov'), ctx = cv.getContext('2d'), tip = $('tip');
+  let tf = '15m', off = D.tz * 3600, times = [], view = [], maxDur = 0, selected = null;
+
+  const chart = LightweightCharts.createChart($('chart'), {
+    layout: { background: { type: 'solid', color: '#0d1117' }, textColor: '#c9d1d9' },
+    grid: { vertLines: { color: '#1b222c' }, horzLines: { color: '#1b222c' } },
+    rightPriceScale: { borderColor: '#30363d' },
+    timeScale: { borderColor: '#30363d', timeVisible: true, secondsVisible: false, rightOffset: 5 },
+    crosshair: { mode: 0 },
+    localization: { priceFormatter: (p) => p.toFixed(1) },
+  });
+  const series = chart.addCandlestickSeries({
+    upColor: '#26a69a', downColor: '#ef5350', borderVisible: false, wickUpColor: '#26a69a', wickDownColor: '#ef5350',
+    autoscaleInfoProvider: (original) => {
+      const r = original();
+      if (r && selected) { const lo = Math.min(selected.sl, selected.tp, selected.e), hi = Math.max(selected.sl, selected.tp, selected.e); r.priceRange.minValue = Math.min(r.priceRange.minValue, lo); r.priceRange.maxValue = Math.max(r.priceRange.maxValue, hi); }
+      return r;
+    },
+  });
+
+  // ---------- helpers ----------
+  const pad = (n) => String(n).padStart(2, '0');
+  function fmt(utc) { const d = new Date((utc + off) * 1000); return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes()); }
+  function fmtShort(utc) { return fmt(utc).slice(5); }
+  function num(p) { return p >= 1000 ? p.toFixed(1) : p.toFixed(2); }
+  function parseDay(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s.trim()); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 1000 - off : null; }
+  function parseTime(s) { const m = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})$/.exec(s.trim()); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) / 1000 - off : null; }
+  const cover = (k, a, b) => D.cov[k] && a >= D.cov[k][0] && b <= D.cov[k][1];
+
+  // ---------- candles ----------
+  function loadTF(newTf, rangeUtc) {
+    let keep = rangeUtc;
+    if (!keep) { const vr = chart.timeScale().getVisibleRange(); if (vr) keep = [vr.from - off, vr.to - off]; }
+    tf = newTf;
+    const arr = D.c[tf];
+    const data = new Array(arr.length);
+    times = new Array(arr.length);
+    for (let i = 0; i < arr.length; i++) { const c = arr[i]; times[i] = c[0] + off; data[i] = { time: c[0] + off, open: c[1], high: c[2], low: c[3], close: c[4] }; }
+    series.setData(data);
+    document.querySelectorAll('[data-tf]').forEach((b) => b.classList.toggle('on', b.dataset.tf === tf));
+    if (keep) { try { chart.timeScale().setVisibleRange({ from: keep[0] + off, to: keep[1] + off }); } catch (e) { chart.timeScale().fitContent(); } }
+    else chart.timeScale().fitContent();
+  }
+  function idx(tUtc) {
+    const t = tUtc + off, n = times.length, bar = TFS[tf];
+    if (!n) return 0;
+    if (t <= times[0]) return (t - times[0]) / bar;
+    if (t >= times[n - 1]) return n - 1 + (t - times[n - 1]) / bar;
+    let lo = 0, hi = n - 1;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (times[m] <= t) lo = m; else hi = m - 1; }
+    return lo + (t - times[lo]) / (times[lo + 1] - times[lo]);
+  }
+  function timeAt(i) {
+    const n = times.length, bar = TFS[tf];
+    if (i <= 0) return times[0] + i * bar - off;
+    if (i >= n - 1) return times[n - 1] + (i - (n - 1)) * bar - off;
+    const lo = Math.floor(i); return times[lo] + (i - lo) * (times[lo + 1] - times[lo]) - off;
+  }
+
+  // ---------- trades, filters, table ----------
+  const all = D.tr.map((t, i) => Object.assign({ id: i }, t)).sort((a, b) => a.a - b.a);
+  all.forEach((t, i) => { t.id = i; });
+  function isWin(t) { return t.r > 0.05; }
+  function setupFilters() {
+    [...new Set(all.map((t) => t.bk))].forEach((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v; $('fbook').appendChild(o); });
+    [...new Set(all.map((t) => t.why))].forEach((v) => { const o = document.createElement('option'); o.value = v; o.textContent = v; $('fwhy').appendChild(o); });
+  }
+  function applyFilters() {
+    const s = $('fside').value, r = $('fres').value, b = $('fbook').value, w = $('fwhy').value;
+    const d0 = parseDay($('dfrom').value), d1 = parseDay($('dto').value);
+    view = all.filter((t) => (!s || t.s === +s) && (!r || (r === 'w') === isWin(t)) && (!b || t.bk === b) && (!w || t.why === w) &&
+      (d0 === null || t.a >= d0) && (d1 === null || t.a < d1 + 86400));
+    maxDur = view.reduce((m, t) => Math.max(m, t.b - t.a), 0);
+    renderStats(); renderTable();
+  }
+  function renderStats() {
+    const risk = +$('risk').value || 50, n = view.length;
+    const wins = view.filter(isWin), tot = view.reduce((a, t) => a + t.r, 0);
+    const gw = wins.reduce((a, t) => a + t.r, 0), gl = view.filter((t) => !isWin(t)).reduce((a, t) => a + t.r, 0);
+    const html = (k, v) => '<div><span>' + k + '</span> ' + v + '</div>';
+    $('stats').innerHTML = n ? html('Trades', n) + html('Win rate', (100 * wins.length / n).toFixed(0) + '%') + html('Avg per trade', (tot / n >= 0 ? '+' : '') + (tot / n).toFixed(3) + 'R ($' + (tot / n * risk).toFixed(2) + ')') +
+      html('Total', (tot >= 0 ? '+' : '') + tot.toFixed(1) + 'R ($' + Math.round(tot * risk).toLocaleString() + ')') + html('Profit factor', gl ? (gw / Math.abs(gl)).toFixed(2) : 'n/a') + html('Risk per trade', '$' + risk) : '<div>No trades match.</div>';
+  }
+  function renderTable() {
+    const body = $('rows'); body.innerHTML = '';
+    const frag = document.createDocumentFragment();
+    const shown = view.slice(Math.max(0, view.length - 600));
+    if (shown.length < view.length) $('note').textContent = 'Showing the last 600 of ' + view.length + ' trades in the list (the chart marks all of them).'; else $('note').textContent = D.label + ' - ' + view.length + ' trades. Times in ' + (off ? 'UTC+8' : 'UTC') + '.';
+    for (const t of shown) {
+      const tr = document.createElement('tr'); tr.className = 'row' + (selected && selected.id === t.id ? ' sel' : ''); tr.dataset.id = t.id;
+      tr.innerHTML = '<td>' + fmt(t.a) + '</td><td class="' + (t.s > 0 ? 'w' : 'l') + '">' + (t.s > 0 ? 'LONG' : 'SHORT') + '</td><td>' + num(t.e) + '</td><td>' + num(t.sl) + '</td><td>' + num(t.tp) + '</td><td class="' + (isWin(t) ? 'w' : 'l') + '">' + (t.r >= 0 ? '+' : '') + t.r.toFixed(2) + '</td><td>' + t.why + '</td>';
+      frag.appendChild(tr);
+    }
+    body.appendChild(frag);
+  }
+  $('rows').addEventListener('click', (e) => { const tr = e.target.closest('tr.row'); if (tr) select(all[+tr.dataset.id], true); });
+
+  function select(t, recenter) {
+    selected = t;
+    if (recenter) {
+      const a = t.a - 2 * 3600, b = Math.max(t.b, t.a + 3600) + 2 * 3600;
+      const k = (b - a) <= 3 * 86400 && cover('5m', a, b) ? '5m' : ((b - a) <= 40 * 86400 && cover('15m', a, b) ? '15m' : '1h');
+      loadTF(k, [a, b]);
+    }
+    document.querySelectorAll('#rows tr').forEach((r) => r.classList.toggle('sel', +r.dataset.id === t.id));
+    const row = document.querySelector('#rows tr.sel'); if (row) row.scrollIntoView({ block: 'nearest' });
+    showTip(t, true);
+  }
+  function showTip(t, pinned) {
+    const money = (t.r * (+$('risk').value || 50));
+    tip.innerHTML = '<b>' + (t.s > 0 ? 'LONG' : 'SHORT') + '</b> ' + t.bk + ' ' + (t.g || '') + (t.w ? ' / ' + t.w : '') + '<br>Entry ' + fmt(t.a) + ' at <b>' + num(t.e) + '</b><br>SL ' + num(t.sl) + ' &nbsp; TP ' + num(t.tp) +
+      '<br>Exit ' + fmt(t.b) + ' at ' + num(t.x) + ' (' + t.why + ')<br><b class="' + (isWin(t) ? 'w' : 'l') + '">' + (t.r >= 0 ? '+' : '') + t.r.toFixed(2) + 'R ($' + money.toFixed(2) + ')</b>';
+    tip.style.display = 'block';
+  }
+
+  // ---------- drawing ----------
+  let dpr = window.devicePixelRatio || 1;
+  function resize() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); cv.style.width = w + 'px'; cv.style.height = h + 'px'; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function lowerBound(arr, t) { let lo = 0, hi = arr.length; while (lo < hi) { const m = (lo + hi) >> 1; if (arr[m].a < t) lo = m + 1; else hi = m; } return lo; }
+  function drawTrade(t, w, sel) {
+    const ts = chart.timeScale();
+    const x0 = ts.logicalToCoordinate(idx(t.a)), x1raw = ts.logicalToCoordinate(idx(t.b));
+    if (x0 === null || x1raw === null) return;
+    const x1 = Math.max(x1raw, x0 + 3);
+    if (x1 < -5 || x0 > w + 5) return;
+    const yE = series.priceToCoordinate(t.e), yS = series.priceToCoordinate(t.sl), yT = series.priceToCoordinate(t.tp), yX = series.priceToCoordinate(t.x);
+    if (yE === null || yS === null || yT === null) return;
+    ctx.fillStyle = 'rgba(38,166,154,' + (sel ? 0.3 : 0.15) + ')'; ctx.fillRect(x0, Math.min(yE, yT), x1 - x0, Math.abs(yT - yE));
+    ctx.fillStyle = 'rgba(239,83,80,' + (sel ? 0.3 : 0.15) + ')'; ctx.fillRect(x0, Math.min(yE, yS), x1 - x0, Math.abs(yS - yE));
+    ctx.lineWidth = sel ? 2 : 1;
+    const hline = (y, c) => { ctx.strokeStyle = c; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y); ctx.stroke(); };
+    hline(yE, '#c9d1d9'); hline(yT, '#26a69a'); hline(yS, '#ef5350');
+    if (sel) { ctx.strokeStyle = '#58a6ff'; ctx.strokeRect(x0, Math.min(yT, yS), x1 - x0, Math.abs(yS - yT)); }
+    ctx.fillStyle = t.s > 0 ? '#26a69a' : '#ef5350'; ctx.beginPath();
+    if (t.s > 0) { ctx.moveTo(x0, yE); ctx.lineTo(x0 - 5, yE + 10); ctx.lineTo(x0 + 5, yE + 10); } else { ctx.moveTo(x0, yE); ctx.lineTo(x0 - 5, yE - 10); ctx.lineTo(x0 + 5, yE - 10); }
+    ctx.closePath(); ctx.fill();
+    if (yX !== null) { ctx.fillStyle = isWin(t) ? '#26a69a' : '#ef5350'; ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x1raw, yX, 3.5, 0, 6.2832); ctx.fill(); ctx.stroke(); }
+    if (sel || x1 - x0 > 70) { ctx.fillStyle = '#e6edf3'; ctx.font = '11px sans-serif'; ctx.fillText((t.r >= 0 ? '+' : '') + t.r.toFixed(2) + 'R ' + t.why, x1raw + 6, (yX === null ? yE : yX) + 4); }
+  }
+  function draw() {
+    requestAnimationFrame(draw);
+    resize();
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    const lr = chart.timeScale().getVisibleLogicalRange();
+    if (!lr || !times.length || !view.length) return;
+    const t0 = timeAt(lr.from), t1 = timeAt(lr.to);
+    let i = lowerBound(view, t0 - maxDur - 1);
+    let count = 0;
+    for (; i < view.length && view[i].a <= t1; i++) { if (view[i].b >= t0) { drawTrade(view[i], w, selected && selected.id === view[i].id); if (++count > 1500) break; } }
+    window.__dbg = { count, from: lr.from, to: lr.to, t0, t1, n: view.length };
+  }
+
+  // ---------- interaction ----------
+  function hit(tUtc, price) {
+    let i = lowerBound(view, tUtc - maxDur - 1), best = null;
+    for (; i < view.length && view[i].a <= tUtc; i++) {
+      const t = view[i];
+      if (t.b >= tUtc && price >= Math.min(t.sl, t.tp, t.e) && price <= Math.max(t.sl, t.tp, t.e)) best = t;
+    }
+    return best;
+  }
+  chart.subscribeCrosshairMove((p) => {
+    if (!p.time || !p.point) { if (selected) showTip(selected, true); else tip.style.display = 'none'; return; }
+    const price = series.coordinateToPrice(p.point.y);
+    const t = price === null ? null : hit(p.time - off, price);
+    if (t) showTip(t, false); else if (selected) showTip(selected, true); else tip.style.display = 'none';
+  });
+  chart.subscribeClick((p) => {
+    if (!p.time || !p.point) return;
+    const price = series.coordinateToPrice(p.point.y), t = price === null ? null : hit(p.time - off, price);
+    if (t) select(t, false);
+  });
+  document.querySelectorAll('[data-tf]').forEach((b) => b.addEventListener('click', () => loadTF(b.dataset.tf)));
+  ['fside', 'fres', 'fbook', 'fwhy', 'dfrom', 'dto'].forEach((id) => $(id).addEventListener('change', applyFilters));
+  $('risk').addEventListener('input', () => { renderStats(); if (selected) showTip(selected, true); });
+  $('tz').addEventListener('change', () => {
+    const vr = chart.timeScale().getVisibleRange(), keep = vr ? [vr.from - off, vr.to - off] : null;
+    off = +$('tz').value * 3600; loadTF(tf, keep); renderTable(); $('dfrom').value = $('dto').value = ''; applyFilters(); if (selected) showTip(selected, true);
+  });
+  function go() {
+    const t = parseTime($('goto').value);
+    if (t === null) { alert('Type the time like 2026-08-31 07:05 (in the timezone chosen at the top).'); return; }
+    const a = t - 3 * 3600, b = t + 3 * 3600, k = cover('5m', a, b) ? '5m' : (cover('15m', a, b) ? '15m' : '1h');
+    loadTF(k, [a, b]);
+    const near = view.filter((x) => Math.abs(x.a - t) <= 600).sort((x, y) => Math.abs(x.a - t) - Math.abs(y.a - t))[0];
+    if (near) select(near, false);
+  }
+  $('gobtn').addEventListener('click', go);
+  $('goto').addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+  document.addEventListener('keydown', (e) => {
+    if (['INPUT', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const cur = selected ? view.findIndex((t) => t.id === selected.id) : -1;
+    const next = view[Math.min(view.length - 1, Math.max(0, cur + (e.key === 'ArrowRight' ? 1 : -1)))];
+    if (next) { select(next, true); e.preventDefault(); }
+  });
+  window.addEventListener('resize', () => chart.applyOptions({}));
+
+  // ---------- start ----------
+  $('tz').value = String(D.tz); $('risk').value = D.risk;
+  setupFilters();
+  loadTF(D.c['15m'].length ? '15m' : '1h');
+  applyFilters();
+  if (view.length) select(view[view.length - 1], true);
+  window.__ready = true;
+  requestAnimationFrame(draw);
+})();
+</script>
+</body>
+</html>
