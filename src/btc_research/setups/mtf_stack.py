@@ -22,6 +22,7 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
     # h4_gate "trend" (default): the 4h close vs 20 bars earlier sets the only allowed side. "any": no 4h filter, both sides allowed.
     # h1_gate "break" (default): the 1h must have closed beyond its prior 20-bar high/low in that side. "any": no 1h filter.
     # With both set to "any" the side is just the 15m break: long above the prior 20-bar high, short below the prior 20-bar low.
+    delay_ms = int(float(cfg.get("entry_delay_minutes", 0)) * 60_000)  # next_open only: the market order reaches the exchange this many minutes late
     h4_gate = cfg.get("h4_gate", "trend")
     h1_gate = cfg.get("h1_gate", "break")
     atr_tf = cfg.get("atr_tf", "15m")
@@ -59,7 +60,7 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
             if fill_mode != "touch" and not (bar.close > level if side == "LONG" else bar.close < level):
                 continue
             if fill_mode == "next_open":
-                i_fill = bisect.bisect_left(times_1m, now)
+                i_fill = bisect.bisect_left(times_1m, now + delay_ms)
                 hit = (i_fill, bars_1m[i_fill].open) if i_fill < len(bars_1m) else None
             elif fill_mode == "touch":
                 hit = _stop_touch(bars_1m, bar.open_time, now, side, level)

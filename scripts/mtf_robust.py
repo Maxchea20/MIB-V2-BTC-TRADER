@@ -60,7 +60,7 @@ def main():
                 print(f"  stop {sl:.1f} ATR  target {tpr}R  " + stats(run(h4_gate=g4, h1_gate=g1, sl_atr=sl, tp_atr=sl * tpr)))
     print("\ncost stress, stop 2.0 ATR, target 5R")
     for label, g4 in (("1h released, 4h trend kept", "trend"), ("both released", "any")):
-        for tag, kw in (("as tested", {}), ("fee 4bp", {"fee_bps_per_side": 4.0}), ("fee 4bp + slip 2bp", {"fee_bps_per_side": 4.0, "slippage_bps": 2.0})):
+        for tag, kw in (("as tested", {}), ("fee 4bp", {"fee_bps_per_side": 4.0}), ("fee 4bp + slip 2bp", {"fee_bps_per_side": 4.0, "slippage_bps": 2.0}), ("order 1 min late", {"entry_delay_minutes": 1}), ("order 3 min late", {"entry_delay_minutes": 3}), ("fee 4bp + slip 2bp + 3 min late", {"fee_bps_per_side": 4.0, "slippage_bps": 2.0, "entry_delay_minutes": 3}))):
             print(f"  {label:<28} {tag:<20}" + stats(run(h4_gate=g4, h1_gate="any", sl_atr=2.0, tp_atr=10.0, **kw)))
 
 
