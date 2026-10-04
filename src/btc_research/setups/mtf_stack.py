@@ -54,6 +54,8 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
             if i_fill >= len(bars_1m):
                 continue
             hit = (i_fill, bars_1m[i_fill].open)
+        elif fill_mode == "touch":
+            hit = _stop_touch(bars_1m, bar.open_time, now, trend, level)
         else:
             hit = _touch(bars_1m, bar.open_time, now, trend, level)
         if hit is None:
@@ -76,6 +78,30 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
         trades.append(trade)
         next_free = trade["exit_time"] + quiet_ms
     return trades, skips
+
+
+def _stop_touch(bars, start, end, side, level):
+    """A resting STOP order at the level: fills only when price trades up to it (long) or down to it (short). A bar that opens beyond it fills at the open."""
+    for i in range(_first(bars, start), len(bars)):
+        bar = bars[i]
+        if bar.open_time >= end:
+            return None
+        if side == "LONG" and bar.high >= level:
+            return i, max(level, bar.open)
+        if side == "SHORT" and bar.low <= level:
+            return i, min(level, bar.open)
+    return None
+
+
+def _first(bars, start):
+    lo, hi = 0, len(bars)
+    while lo < hi:
+        mid = (lo + hi) // 2
+        if bars[mid].open_time < start:
+            lo = mid + 1
+        else:
+            hi = mid
+    return lo
 
 
 def _trend(bars, now, lookback):
