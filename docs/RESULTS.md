@@ -1,3 +1,8 @@
+> **INVALID (2026-10-04): every Hunt / Hunt V3 / Hunt V4 number in this file used a fake fill.**
+> The backtest filled Hunt at the broken 15m level, but the signal is only known when the 5m candle closes beyond it, so that price was no longer available.
+> With the real fill (next 1m open after the close, `realfill` flag) Hunt alone is about -0.12R per trade and Hunt V4 on research_binance is -0.082R, -105R, dip -117R.
+> Do not trade or build on these results. The chop book already used a real fill (next 1h open); judge it separately (`py scripts\show_chop.py`).
+
 # Backtest results log
 
 Baseline: Hunt V3 (config/experiments/lock-3-hunt-v3.md). Everything else is compared against it. Names and a one-table summary of every version: docs/VERSIONS.md. Latest lock: Hunt V4 (Hunt V3 + Floors), config/experiments/lock-4-hunt-v4.md, locked 2026-10-04T12:28:04Z.
