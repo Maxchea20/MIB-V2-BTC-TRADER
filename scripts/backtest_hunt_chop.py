@@ -37,6 +37,13 @@ def main():
     for trade in kept:
         trade["book"] = "HUNT"
     merged = _one_position(kept, chop)
+    if "breakout" in sys.argv[3:]:
+        tests = {}
+        for mode in ("atr", "line", "trail"):
+            brk = _breakouts(series, chop, mode)
+            tests[mode] = {"breakout_alone": _bucket(brk), "combined": _bucket(_one_position(kept, chop + brk))}
+        print(json.dumps({"db": db.name, "hunt_file": str(hunt_file), "base": _bucket(merged), "breakout_tests": tests}, indent=2))
+        return
     folder = ROOT / "results" / ("exp-hunt-chop-swing" if swing_only else ("exp-hunt-chop-hours" if hours else "exp-hunt-chop-arbiter")) / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder.mkdir(parents=True, exist_ok=True)
     with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -54,6 +61,79 @@ def main():
         "one_position": _bucket(merged),
         "file": str(folder / "trades.csv"),
     }, indent=2))
+
+
+def _atr(series, i):
+    if i < 15:
+        return None
+    acc = 0.0
+    prev = series[i - 14].close
+    for bar in series[i - 13 : i + 1]:
+        acc += max(bar.high - bar.low, abs(bar.high - prev), abs(bar.low - prev))
+        prev = bar.close
+    return acc / 14
+
+
+def _breakouts(series, chop, mode):
+    """After a chop stop (a close through the line), trade the break in that direction. Entry at the next 1h open."""
+    index = {b.open_time: i for i, b in enumerate(series)}
+    out = []
+    for t in chop:
+        if t["exit_reason"] != "STOP" or t["exit_time"] not in index:
+            continue
+        i = index[t["exit_time"]]
+        if i + 1 >= len(series):
+            continue
+        nxt = series[i + 1]
+        side = "SHORT" if t["side"] == "LONG" else "LONG"
+        sign = 1 if side == "LONG" else -1
+        entry = nxt.open + sign * (0.1 + nxt.open * 0.00005)
+        line = t["line_low"] if t["side"] == "LONG" else t["line_high"]
+        if mode == "atr":
+            atr = _atr(series, i)
+            if not atr:
+                continue
+            risk = 1.5 * atr
+            stop, target = entry - sign * risk, entry + sign * 2.5 * atr
+        else:
+            risk = (entry - line) * sign
+            if risk <= 0:
+                continue
+            stop, target = line, (entry + sign * 2 * risk if mode == "line" else None)
+        trade = {"book": "BRK", "side": side, "entry": entry, "stop": stop, "target": target, "risk": risk, "entry_time": nxt.open_time}
+        done = _walk_break(trade, series, i + 1, mode, sign)
+        if done:
+            out.append(done)
+    return out
+
+
+def _walk_break(trade, series, start, mode, sign):
+    entry, risk, best = trade["entry"], trade["risk"], trade["entry"]
+    stop = trade["stop"]
+    for bar in series[start : start + 7 * 24]:
+        if mode == "atr":
+            stopped = bar.low <= stop if sign == 1 else bar.high >= stop
+        elif mode == "line":
+            stopped = bar.close < stop if sign == 1 else bar.close > stop
+        else:
+            stopped = bar.low <= stop if sign == 1 else bar.high >= stop
+        target = trade["target"]
+        got = target is not None and (bar.high >= target if sign == 1 else bar.low <= target)
+        if stopped or got:
+            price = stop if stopped else target
+            reason = "STOP" if stopped else "TARGET"
+            return _close_break(trade, price, bar.open_time, reason)
+        if mode == "trail":
+            best = max(best, bar.high) if sign == 1 else min(best, bar.low)
+            stop = max(trade["stop"], best - risk) if sign == 1 else min(trade["stop"], best + risk)
+    return None
+
+
+def _close_break(trade, price, exit_time, reason):
+    gross = (price - trade["entry"]) * (1 if trade["side"] == "LONG" else -1)
+    net = gross - (trade["entry"] + price) * 0.0002
+    trade.update({"exit": price, "exit_time": exit_time, "exit_reason": reason, "net_pnl": net, "r_multiple": net / trade["risk"]})
+    return trade
 
 
 def _flags(series):
@@ -160,6 +240,7 @@ def _bucket(rows):
         "drawdown_r": round(dip, 2),
         "hunt": sum(t.get("book", "HUNT") == "HUNT" for t in rows),
         "chop": sum(t.get("book") == "CHOP" for t in rows),
+        "brk": sum(t.get("book") == "BRK" for t in rows),
     }
 
 
