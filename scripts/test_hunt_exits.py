@@ -6,6 +6,12 @@ Schemes (ATR from entry; stop is always 1.5 ATR first):
   half@X BE   sell half at X ATR, stop to entry for the rest, rest runs to 2.5 ATR
   half@X      sell half at X ATR, stop stays, rest runs to 2.5 ATR
   trail       once 1.4 ATR is reached, trail 1.0 ATR behind the best price; still capped at 2.5 ATR
+  giveback    once 1.4 ATR is reached, exit if price gives back 40% of the best move
+  eye ...     once 1.4 ATR is reached, watch the closed 15m candles and sell at the next 1m open when:
+              structure = a 15m close below the lowest low of the 3 candles before it
+              stall     = 4 closed 15m candles with no new best price (1 hour)
+              reversal  = a 15m candle with a body over half its range, closing in its bottom third against the trade
+              any       = any of the three
 Stop wins when a bar touches the stop and a level. Fee 2 bp a side on each fill. Max hold 3 days.
 Usage: py scripts\\test_hunt_exits.py research_2022_25
 """
@@ -32,7 +38,21 @@ SCHEMES = [
     ("half@1.0", dict(target=2.5, half=1.0, be=False)),
     ("half@1.4", dict(target=2.5, half=1.4, be=False)),
     ("trail 1.4/1.0", dict(target=2.5, arm=1.4, dist=1.0)),
+    ("giveback 40%", dict(target=2.5, arm=1.4, frac=0.4)),
+    ("eye structure", dict(target=2.5, eye="struct", arm_eye=1.4)),
+    ("eye stall", dict(target=2.5, eye="stall", arm_eye=1.4)),
+    ("eye reversal", dict(target=2.5, eye="rev", arm_eye=1.4)),
+    ("eye any", dict(target=2.5, eye="any", arm_eye=1.4)),
 ]
+
+
+def _eye_fires(kind, candles, last_high_idx):
+    c = candles[-1]
+    struct = len(candles) >= 4 and c["cl"] < min(x["lo"] for x in candles[-4:-1])
+    stall = len(candles) - 1 - last_high_idx >= 4
+    span = c["hi"] - c["lo"]
+    rev = span > 0 and abs(c["cl"] - c["op"]) / span >= 0.5 and c["cl"] < c["op"] and c["cl"] <= c["lo"] + span / 3
+    return {"struct": struct, "stall": stall, "rev": rev, "any": struct or stall or rev}[kind]
 
 
 def replay(bars, i, trade, cfg):
@@ -47,6 +67,11 @@ def replay(bars, i, trade, cfg):
     pnl = fees = 0.0
     half_done = False
     last = None
+    eye = cfg.get("eye")
+    candles = []
+    cur = None
+    last_high_idx = 0
+    pending = False
 
     def sell(frac, price_p):
         nonlocal left, pnl, fees
@@ -58,6 +83,21 @@ def replay(bars, i, trade, cfg):
         hi = bar.high if sign == 1 else -bar.low
         lo = bar.low if sign == 1 else -bar.high
         last = sign * bar.close
+        if eye:
+            key = bar.open_time // 900_000
+            if cur is not None and cur["key"] != key:
+                candles.append(cur)
+                armed = best >= e + cfg["arm_eye"] * atr
+                if armed and _eye_fires(eye, candles, last_high_idx):
+                    pending = True
+                cur = None
+            if cur is None:
+                cur = {"key": key, "op": sign * bar.open, "hi": hi, "lo": lo, "cl": sign * bar.close}
+            else:
+                cur["hi"], cur["lo"], cur["cl"] = max(cur["hi"], hi), min(cur["lo"], lo), sign * bar.close
+            if pending:
+                sell(left, sign * bar.open)
+                break
         if lo <= stop_p:
             sell(left, stop_p)
             break
@@ -69,9 +109,13 @@ def replay(bars, i, trade, cfg):
         if hi >= e + cfg["target"] * atr:
             sell(left, e + cfg["target"] * atr)
             break
-        best = max(best, hi)
-        if "arm" in cfg and best >= e + cfg["arm"] * atr:
+        if hi > best:
+            best = hi
+            last_high_idx = len(candles)
+        if "dist" in cfg and best >= e + cfg["arm"] * atr:
             stop_p = max(stop_p, best - cfg["dist"] * atr)
+        if "frac" in cfg and best >= e + cfg["arm"] * atr:
+            stop_p = max(stop_p, best - cfg["frac"] * (best - e))
     if left > 1e-9:
         sell(left, last if last is not None else e)
     return (pnl - fees) / risk
