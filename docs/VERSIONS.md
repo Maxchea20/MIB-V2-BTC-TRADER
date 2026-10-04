@@ -1,5 +1,7 @@
 # Versions and names
 
+**Latest lock: Hunt V4 (Hunt V3 + Floors), locked 2026-10-04T12:28:04Z** (`config/experiments/lock-4-hunt-v4.md`)
+
 One name for each thing. Numbers are total R / worst drop (dip) in R, for 2019-21, 2022-25, 2025-26. At $50 risk, 1R = $50. Per-year dollars use 2.0, 3.67 and 1.08 years.
 
 ## Building blocks
@@ -16,7 +18,7 @@ One name for each thing. Numbers are total R / worst drop (dip) in R, for 2019-2
 | **Hunt + Floors** | Hunt with Floors | +536 / -28.5, +1156 / -41.4, +325 / -28.9 | $13,400, $15,700, $15,000 | tested in the full engine |
 | **Hunt + Floors + Throttle** | Hunt + Floors with Throttle | +474 / -22.2, +1074 / -31.0, +292 / -20.1 | $11,900, $14,700, $13,500 | current leader. Throttle tested on the trade list, not yet in the engine |
 | **Hunt V3** | Hunt + box filter (drop Hunt trades while the box is on) + chop book (lock 3) | corrected: +174 / -54.4, +520 / -21.9, +161 / -16.6 | $4,350, $7,100, $7,450 | corrected for the box peek. Old numbers were higher |
-| **Hunt V3 + Floors** | Hunt V3 with Floors, corrected | +230 / -39.9, +636 / -19.1, +203 / -22.7 | $5,750, $8,700, $9,400 | box fixed. Old (peeked) numbers were +263 / +709 / +228 |
+| **Hunt V4** = Hunt V3 + Floors | Hunt V3 with Floors, corrected | +230 / -39.9, +636 / -19.1, +203 / -22.7 | $5,750, $8,700, $9,400 | LATEST lock, 2026-10-04T12:28:04Z. Box fixed. Old (peeked) numbers were +263 / +709 / +228 |
 | **Chop book** | the chop book alone | +79 / -26.4, +206 / -31.2, +66 / -16.8 | | positive on all files, not affected by the box peek |
 | **Swing Hunt + Chop** (test) | Hunt only in swing weather + chop book | +100 / -29.3, +224 / -24.4, +122 / -19.6 | | Hunt side used the peeking box, needs a re-run. Not a lock |
 
