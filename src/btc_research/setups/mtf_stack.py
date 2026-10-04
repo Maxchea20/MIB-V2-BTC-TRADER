@@ -119,23 +119,37 @@ def _first(bars, start):
     return lo
 
 
+_CLOSE_TIMES = {}
+
+
+def _n_closed(bars, now):
+    """How many bars have closed by `now` (close_time <= now). Cached close times per series."""
+    key = id(bars)
+    got = _CLOSE_TIMES.get(key)
+    if got is None or got[0] is not bars:
+        got = (bars, [b.close_time for b in bars])
+        _CLOSE_TIMES[key] = got
+    return bisect.bisect_right(got[1], now)
+
+
 def _trend(bars, now, lookback):
-    closed = [b for b in bars if b.close_time <= now]
-    if len(closed) <= lookback:
+    n = _n_closed(bars, now)
+    if n <= lookback:
         return "NONE"
-    if closed[-1].close > closed[-1 - lookback].close:
+    last, past = bars[n - 1].close, bars[n - 1 - lookback].close
+    if last > past:
         return "LONG"
-    if closed[-1].close < closed[-1 - lookback].close:
+    if last < past:
         return "SHORT"
     return "NONE"
 
 
 def _broke(bars, now, lookback, side):
-    closed = [b for b in bars if b.close_time <= now]
-    if len(closed) <= lookback:
+    n = _n_closed(bars, now)
+    if n <= lookback:
         return False
-    window = closed[-1 - lookback:-1]
-    bar = closed[-1]
+    window = bars[n - 1 - lookback:n - 1]
+    bar = bars[n - 1]
     if side == "LONG":
         return bar.close > max(b.high for b in window)
     return bar.close < min(b.low for b in window)
