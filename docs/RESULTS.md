@@ -198,6 +198,22 @@ Read:
 - So 12-16h makes each trade better but does not beat Hunt V3 per unit of risk. It would matter more if live costs per trade turn out higher than the 2 bp fee modeled here.
 - Chop trades taken rise (86 to 109, 150 to 193, 255 to 331) because Hunt blocks it less.
 
+## Hunt V3 with Hunt limited to 08-24h UTC (cuts 00-08h; chop any hour)
+
+| File | Strategy | Trades | Avg R | Total R | Max dip | R/dip |
+|---|---|---|---|---|---|---|
+| 2019-21 | Hunt V3 | 1526 | +0.152 | +231 | -40.9 | 5.7 |
+| | Hunt only 08-24h | 1104 (Hunt 937 / chop 167) | +0.226 | +250 | -21.0 | **11.9** |
+| 2022-25 | Hunt V3 | 2549 | +0.208 | +531 | -23.8 | **22.3** |
+| | Hunt only 08-24h | 1954 (Hunt 1681 / chop 273) | +0.228 | +445 | -29.2 | 15.2 |
+| 2025-26 | Hunt V3 | 950 | +0.191 | +182 | -15.8 | **11.5** |
+| | Hunt only 08-24h | 717 (Hunt 627 / chop 90) | +0.195 | +139 | -22.1 | 6.3 |
+
+Read:
+- Better than Hunt V3 on 2019-21 only (more total R, half the dip). On 2022-25 and 2025-26 it has less total R and a worse dip, with avg R barely changed (+0.02R, +0.004R).
+- Neither hours filter (12-16h or 08-24h) beats Hunt V3 on all three files. Hunt V3 stays the baseline.
+- Dips move in both directions when trades are removed, because the one-position sequence reshuffles; a single dip number is noisy.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
