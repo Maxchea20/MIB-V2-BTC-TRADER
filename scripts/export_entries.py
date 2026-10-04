@@ -8,6 +8,7 @@ Usage: py scripts\\export_entries.py research_binance [from=2025-11-06] [to=2025
   from / to   keep entries in this UTC date range (default: all)
   max         how many entries go into the Pine script (the CSV has all; default 150, Pine allows 500 labels)
   source      base = the Hunt trades from your Hunt run (default). floors = the newest floors Hunt file for this period
+  random      print this many random entries to the screen (for a quick check) and stop. seed=<number> repeats the same picks
 Writes results\\tradingview\\<file>_entries.csv and <file>_entries.pine
 """
 
@@ -91,6 +92,14 @@ def main():
     name = sys.argv[1]
     opts = dict(a.split("=", 1) for a in sys.argv[2:] if "=" in a)
     rows = load(name, opts.get("source", "base"), opts.get("from"), opts.get("to"))
+    if "random" in opts:
+        import random
+        pick = sorted(random.Random(int(opts["seed"]) if "seed" in opts else None).sample(rows, min(int(opts["random"]), len(rows))), key=lambda r: r["_ts"])
+        print(f"{name}: {len(pick)} random entries out of {len(rows)}. Check on a 5m chart, BINANCE:BTCUSDT.P, timezone UTC. The signal is the 5m candle that ends at the entry time")
+        print("  entry UTC         UTC+8             side   entry price   stop        target      result")
+        for r in pick:
+            print(f"  {r['entry_utc']}  {r['entry_utc8']}  {r['side']:<5} {r['entry_price']:<12} {r['stop']:<11} {r['target']:<11} {r['exit']} {r['R']:+}R")
+        return
     out = ROOT / "results" / "tradingview"
     out.mkdir(parents=True, exist_ok=True)
     cols = [c for c in rows[0] if not c.startswith("_")]
