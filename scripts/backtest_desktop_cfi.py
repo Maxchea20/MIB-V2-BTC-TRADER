@@ -25,18 +25,21 @@ def main():
     room = "room-ex" if "room-ex" in args else ("room" if "room" in args else None)
     block = "room-block" in args
     exitmode = next((m for m in hunt_exits.MODES if m in args), None)
-    flags = ("trail-1atr", "room", "room-ex", "room-block") + tuple(hunt_exits.MODES)
+    realfill = "realfill" in args
+    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill") + tuple(hunt_exits.MODES)
     paths = [a for a in args if a not in flags] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, realfill)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
         if exitmode:
             name = f"exp-hunt-desktop-cfi-{exitmode}"
+        if realfill:
+            name += "-realfill"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -48,12 +51,14 @@ def main():
         row["room"] = room
         row["room_block"] = block
         row["exitmode"] = exitmode
+        row["realfill"] = realfill
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, realfill=False):
     trades = []
+    by_open = {b.open_time: b for b in bars} if realfill else None
     open_trade = None
     quiet_until = 0
     atrs = _atr(bars_15)
@@ -98,6 +103,13 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         atr = atrs[j15 - 1]
         slip = 0.1 + level * 0.00005
         entry = level + slip if side == "LONG" else level - slip
+        if realfill:
+            # the signal is only known when the 5m candle closes: the first price you can get is the next 1m open
+            nxt = by_open.get(entry_time)
+            if nxt is None:
+                continue
+            slip = 0.1 + nxt.open * 0.00005
+            entry = nxt.open + slip if side == "LONG" else nxt.open - slip
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
             "entry": entry,

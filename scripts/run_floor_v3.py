@@ -4,7 +4,7 @@ Modes (see src/btc_research/setups/hunt_exits.py):
   floors  floor at +1R once the best price is 1.75 ATR, floor at +2.0 ATR once it is 2.25 ATR
   eye2    the same floors with no cushion (1.5 / 2.0 ATR) plus the eye from 1.5 ATR on
 Needs the saved Hunt V3 run for the same file (scripts\\run_lock3_all.bat) for the comparison lines.
-Usage: py scripts\\run_floor_v3.py research_binance floors
+Usage: py scripts\\run_floor_v3.py research_binance floors [realfill]
 """
 
 import json
@@ -30,11 +30,13 @@ def _run(*args):
 
 def main():
     name, mode = sys.argv[1], sys.argv[2]
+    extra = [a for a in sys.argv[3:] if a == "realfill"]
+    tag = mode + ("-realfill" if extra else "")
     saved_hunt = _load((ROOT / "results" / "lock3" / f"{name}_hunt.txt").read_text(encoding="utf-8", errors="replace"))
     saved_v3 = _load((ROOT / "results" / "lock3" / f"{name}_switch.txt").read_text(encoding="utf-8", errors="replace"))
-    hunt = _load(_run(str(ROOT / "scripts" / "backtest_desktop_cfi.py"), f"backend/{name}.db", mode))
-    v3 = _load(_run(str(ROOT / "scripts" / "backtest_hunt_chop.py"), f"backend/{name}.db", hunt["file"], f"tag={mode}"))
-    print(f"{name} {mode} inside the full engine")
+    hunt = _load(_run(str(ROOT / "scripts" / "backtest_desktop_cfi.py"), f"backend/{name}.db", mode, *extra))
+    v3 = _load(_run(str(ROOT / "scripts" / "backtest_hunt_chop.py"), f"backend/{name}.db", hunt["file"], f"tag={tag}"))
+    print(f"{name} {tag} inside the full engine")
     print("  Hunt alone, now   " + _fmt(saved_hunt["combined"]))
     print(f"  Hunt alone, {mode:<6}" + _fmt(hunt["combined"]))
     print("  Hunt V3, now      " + _fmt(saved_v3["one_position"]))
