@@ -361,6 +361,30 @@ Hunt V3 with floors vs Hunt V3 now:
 - Worst dip at $50: $1,405 / $980 / $1,060 (now: $2,045 / $1,190 / $790).
 - Not yet tested: eye2 in the engine (only floors), fee and slippage stress, and live order handling.
 
+## Hunt alone with floors: where the drawdown is, and risk rules (no chop book)
+
+Run with `scripts/diagnose_hunt_drawdown.py`. Reads the floors Hunt trade file for each period. Rules: day cap (no new trade once the UTC day is down 3R), pause (skip 12h after 4 losses in a row), throttle (half size while the equity is 10R or more below its peak).
+
+| | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| A all trades | 4901, +0.109, +536R, dip -28.5, R/dip 18.8 | 8773, +0.132, +1156R, dip -41.4, 27.9 | 2655, +0.122, +325R, dip -28.9, 11.3 |
+| B outside box (Hunt V3's Hunt book, no chop) | 2527, +0.117, +297R, -25.8, 11.5 | 3889, +0.161, +627R, -20.4, 30.7 | 1311, +0.158, +208R, -16.2, 12.8 |
+| C inside box | 2374, +0.101, +239R, -22.2, 10.8 | 4884, +0.108, +528R, -47.0, 11.2 | 1344, +0.087, +117R, -20.9, 5.6 |
+| A + day cap | 4474, +0.113, +504R, -29.0, 17.4 | 8036, +0.125, +1004R, -30.5, 32.9 | 2442, +0.126, +306R, -20.8, 14.8 |
+| A + pause | 4515, +0.116, +522R, -29.7, 17.6 | 8139, +0.134, +1088R, -35.3, 30.8 | 2452, +0.122, +298R, -24.1, 12.4 |
+| **A + throttle** | 4901, +0.097, +474R, **-22.2**, **21.3** | 8773, +0.122, +1074R, **-31.0**, **34.7** | 2655, +0.110, +292R, **-20.1**, **14.5** |
+| B + throttle | 2527, +0.099, +250R, -18.4, 13.5 | 3889, +0.155, +604R, -16.7, 36.2 | 1311, +0.143, +188R, -14.4, 13.0 |
+
+3 worst drawdowns in A: 2019-21: 2020-08-16 to 2020-10-05 -28.5R (321 trades), 2021-08-12 to 08-27 -20.5R, 2021-02-03 to 02-09 -18.8R. 2022-25: 2023-08-08 to 08-29 -41.4R (106 trades), 2025-06-26 to 07-21 -27.7R, 2024-09-20 to 10-10 -25.7R. 2025-26: 2026-04-20 to 05-15 -28.9R (189 trades), 2026-01-17 to 01-27 -17.1R, 2025-11-06 to 11-28 -15.2R.
+
+Read:
+- Losses do not cluster: 44-47% of trades lose, and after 3 losses in a row 44-46% still lose. A pause rule has nothing to work with (and it does little).
+- Throttle is the best simple rule. It cuts the dip by 22-30% on all three files and keeps 88-93% of the profit. R/dip rises on all three (+13% to +28%).
+- Day cap helps on two files (dip -28% and -26%) and does nothing on 2019-21.
+- Outside the box, trades are better (+0.12 to +0.16R vs +0.09 to +0.11R inside) and the drop is smaller, but total R is about half. Inside-box trades hold the worst drop on 2022-25 (-47R).
+- Hunt alone + floors + throttle vs Hunt V3 + floors (R/dip): 21.3 vs 9.4, 34.7 vs 36.1, 14.5 vs 10.7. It earns about 1.5-2x the profit.
+- At $50 risk, per year, Hunt alone + floors + throttle: about $11,850 / $14,650 / $13,500 with worst drops $1,110 / $1,550 / $1,005.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.

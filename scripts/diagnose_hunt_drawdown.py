@@ -7,6 +7,7 @@ Reads the newest `floors` Hunt trade file for the period (run scripts\\run_floor
     day cap     no new trade for the rest of the UTC day once the day is down 3R
     pause       after 4 losses in a row, skip trades for 12 hours
     throttle    half size while the equity is 10R or more below its peak
+  and on A only: box half (trades inside the box at half size) and box half + throttle
 Usage: py scripts\\diagnose_hunt_drawdown.py research_2022_25
 """
 
@@ -133,12 +134,16 @@ def main():
     losses = [r < 0 for _, r in a]
     after3 = [losses[i] for i in range(3, len(losses)) if all(losses[i - 3:i])]
     print(f"  loss clustering: {sum(losses) / len(losses):.0%} of trades lose; after 3 losses in a row {sum(after3) / len(after3):.0%} lose (n={len(after3)})")
+    half = [(t, r * (0.5 if box else 1.0)) for t, r, box in rows]
     for label, rows_ in (("A", a), ("B", b)):
         print(f"  risk rules on {label}:")
         print("    none      " + _stats([r for _, r in rows_]))
         print("    day cap   " + _stats(_day_cap(rows_)))
         print("    pause     " + _stats(_pause(rows_)))
         print("    throttle  " + _stats(_throttle(rows_)))
+        if label == "A":
+            print("    box half  " + _stats([r for _, r in half]))
+            print("    box half + throttle " + _stats(_throttle(half)))
 
 
 def _first_year(path):
