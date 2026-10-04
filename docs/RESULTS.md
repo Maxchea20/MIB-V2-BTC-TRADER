@@ -423,6 +423,41 @@ Hunt V3 + Floors with the fixed box (`scripts/run_box_lag_check.py <file> floors
 - Hunt V3 + Floors (fixed) vs Hunt + Floors + Throttle, R/dip: 5.8 vs 21.3, 33.4 vs 34.7, 8.9 vs 14.5. Hunt + Floors + Throttle is ahead or equal on every file and earns about 2x on 2019-21 and 2025-26.
 - Fixed Hunt V3 + Floors at $50 risk per year: about $5,750 / $8,700 / $9,400, worst drops $1,995 / $955 / $1,135.
 
+## Forensic of the Hunt V4 drops (3 worst drawdowns per file)
+
+Run with `scripts/forensic_v4_drops.py`. The rebuilt Hunt V4 matched the lock on all three files (2027 / 3420 / 1229 trades, +231 / +636 / +203R, dips -39.9 / -19.1 / -22.7R).
+
+| # | File | Window | Depth | Trades | Days | BTC move | Trend (0-1) | Vol vs median | Long / short avg R | Hunt / chop avg R |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | 2025-26 | 2025-11-06 to 11-28 | -22.7R | 112 | 22 | -12.1% | 0.06 | 1.46x | -0.39 / -0.03 | -0.16 / -1.06 |
+| 2 | 2025-26 | 2026-04-20 to 05-07 | -13.7R | 40 | 17 | +6.4% | 0.07 | 1.00x | -0.28 / -0.37 | -0.15 / -1.23 |
+| 3 | 2025-26 | 2025-10-23 to 10-28 | -10.2R | 34 | 5 | +3.7% | 0.14 | 0.87x | +0.08 / -0.64 | -0.30 / n/a |
+| 1 | 2022-25 | 2025-04-11 to 05-22 | -19.1R | 134 | 40 | +31.2% | 0.10 | 0.77x | -0.07 / -0.22 | -0.04 / -1.05 |
+| 2 | 2022-25 | 2023-07-28 to 08-29 | -18.0R | 102 | 32 | -11.1% | 0.09 | 0.58x | -0.31 / -0.01 | -0.17 / -0.34 |
+| 3 | 2022-25 | 2024-08-27 to 09-14 | -17.7R | 77 | 18 | -3.8% | 0.02 | 1.17x | -0.15 / -0.35 | -0.20 / -1.03 |
+| 1 | 2019-21 | 2020-07-15 to 08-25 | -39.9R | 153 | 41 | +26.0% | 0.07 | 0.73x | -0.21 / -0.34 | -0.14 / -1.64 |
+| 2 | 2019-21 | 2021-11-17 to 12-15 | -19.6R | 89 | 28 | -19.0% | 0.06 | 1.23x | -0.22 / -0.22 | -0.11 / -1.17 |
+| 3 | 2019-21 | 2020-01-10 to 02-06 | -17.1R | 125 | 27 | +25.7% | 0.10 | 0.85x | +0.08 / -0.43 | -0.09 / -1.07 |
+
+Worst drop in detail (window vs whole file):
+
+| | 2025-26 (-22.7R) | 2022-25 (-19.1R) | 2019-21 (-39.9R) |
+|---|---|---|---|
+| Hunt trades | 107, -0.16R, total -17.4R | 120, -0.04R, total -4.3R | 141, -0.14R, total -20.2R |
+| Chop trades | 5, -1.06R, 0 wins, total -5.3R (file +0.60R) | 14, -1.05R, 0 wins, total -14.7R (file +0.74R) | 12, -1.64R, 0 wins, total -19.7R (file +0.31R) |
+| Long / short | -0.39R (31% win) / -0.03R | -0.07R / -0.22R | -0.21R / -0.34R |
+| Exits | 37 floors (+0.99R), 67 stops (-1.07R), 8 targets | 48 floors (+0.97R), 75 stops (-1.10R), 11 targets | 51 floors (+0.96R), 91 stops (-1.17R), 11 targets |
+| Weather CHOP / SWING_UP / SWING_DOWN | -0.13R (89) / -1.08R (3) / -0.17R (15) | -0.14R (96) / +0.40R (18) / +0.34R (6) | -0.17R (110) / +0.16R (24) / -0.80R (7) |
+| Worst entry hours (UTC) | 20-24h -13.3R, 04-08h -6.2R | 04-08h -10.7R, 12-16h -5.8R | 04-08h -13.7R, 00-04h -10.6R |
+
+Read:
+- The drops are choppy markets, not trends. Trend score is 0.02-0.14 in all nine drops, even when BTC moved +31%, +26% or -12% over the window (price zig-zagged). Volatility is not consistent (0.58x to 1.46x of normal).
+- The chop book is a large share of the worst drops from very few trades: 31 chop trades, 0 wins, -39.7R in total (22%, 77%, 49% of the three worst drops). Chop losses average -1.05R to -1.64R, more than -1R, because a tight stop makes the fee large in R.
+- In the worst drops the side against the move over the window loses most (longs in the -12% window, shorts in the +31% and +26% windows). Weather CHOP trades (80% of trades) carry the loss; SWING_UP trades were positive in two of three files.
+- Floors trades hold up inside the drops (about +1.0R each, same as the file). The loss is stops (-72R to -107R).
+- 04-08h UTC is among the two worst hour blocks in all three worst drops, matching the earlier feature scan.
+- Next: `scripts/test_v4_tweaks.py` (no chop, no 04-08h entries, chop with a minimum stop distance, chop at half size).
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
