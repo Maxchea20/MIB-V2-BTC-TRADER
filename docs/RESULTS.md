@@ -407,6 +407,22 @@ Read:
 - Not affected: Hunt alone with floors (+536R, +1156R, +325R) and Hunt alone with floors and throttle (+474R, +1074R, +292R; dips -22.2, -31.0, -20.1). Hunt alone + floors + throttle is now ahead of Hunt V3 on every file.
 - The lock file `config/experiments/lock-3-hunt-v3.md` still shows the old 2025-26 numbers (950 trades, +0.191R, dip -15.8R). Corrected: 954 trades, +0.169R, dip -16.6R.
 
+Hunt V3 + Floors with the fixed box (`scripts/run_box_lag_check.py <file> floors`, floors Hunt file):
+
+| File | Reading | Hunt outside the box | Hunt V3 + Floors |
+|---|---|---|---|
+| 2025-26 | old (peeks) | 1311, +0.158, +208R, dip -16.2, R/dip 12.8 | 1211, +0.188, +228R, dip -21.2, 10.7 |
+| | fixed | 1293, +0.135, +174R, dip -19.0, 9.2 | 1229, +0.165, +203R, dip -22.7, 8.9 |
+| 2019-21 | old | 2527, +0.117, +297R, dip -25.8, 11.5 | 1976, +0.133, +263R, dip -28.1, 9.4 |
+| | fixed | 2516, +0.093, +234R, dip -27.7, 8.5 | 2027, +0.114, +230R, dip -39.9, 5.8 |
+| 2022-25 | old | 3889, +0.161, +627R, dip -20.4, 30.7 | 3353, +0.211, +709R, dip -19.6, 36.1 |
+| | fixed | 3837, +0.133, +511R, dip -20.1, 25.5 | 3420, +0.186, +636R, dip -19.1, 33.4 |
+
+- The "old" rows match the earlier floors-in-the-engine numbers, so the check is wired correctly.
+- Fixed Hunt V3 + Floors vs fixed Hunt V3 (no floors): total R +32%, +22%, +26% (+174 to +230, +520 to +636, +161 to +203). Dip better on 2019-21 (-54.4 to -39.9) and 2022-25 (-21.9 to -19.1), worse on 2025-26 (-16.6 to -22.7).
+- Hunt V3 + Floors (fixed) vs Hunt + Floors + Throttle, R/dip: 5.8 vs 21.3, 33.4 vs 34.7, 8.9 vs 14.5. Hunt + Floors + Throttle is ahead or equal on every file and earns about 2x on 2019-21 and 2025-26.
+- Fixed Hunt V3 + Floors at $50 risk per year: about $5,750 / $8,700 / $9,400, worst drops $1,995 / $955 / $1,135.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
