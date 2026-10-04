@@ -214,6 +214,42 @@ Read:
 - Neither hours filter (12-16h or 08-24h) beats Hunt V3 on all three files. Hunt V3 stays the baseline.
 - Dips move in both directions when trades are removed, because the one-position sequence reshuffles; a single dip number is noisy.
 
+## Hunt V3: TP/SL counts, move after the exit, and swing size
+
+Run with `scripts/diagnose_v3_after_exit.py`. After-exit window = 24 hours of 1m bars. Swing run = best price from entry until it pulls back 1R from its peak (max 7 days). Hunt in ATR (stop = 1.5 ATR), chop in R (stop distance).
+
+TP / SL counts:
+
+| File | Hunt TP | Hunt SL | Chop TP | Chop SL |
+|---|---|---|---|---|
+| 2019-21 | 607 (44%) | 769 (56%) | 26 (17%) | 124 (83%) |
+| 2022-25 | 1084 (47%) | 1210 (53%) | 52 (20%) | 203 (80%) |
+| 2025-26 | 409 (47%) | 455 (53%) | 23 (27%) | 63 (73%) |
+
+Hunt swing run from entry (median / p75 / p90 / max):
+
+| File | ATR | Price |
+|---|---|---|
+| 2019-21 | 1.31 / 2.33 / 3.68 / 16.2 | $148 / $412 / $850 / $5,019 |
+| 2022-25 | 1.42 / 2.54 / 4.02 / 29.6 | $275 / $547 / $1,065 / $5,167 |
+| 2025-26 | 1.40 / 2.65 / 4.23 / 20.1 | $388 / $748 / $1,359 / $5,307 |
+
+Chop swing run (R): median 0.75-0.79, p75 1.23-1.38, p90 2.30-2.49, max 4.9-8.5. Price median $187 / $279 / $367.
+
+After the exit (24h), medians:
+
+| File | Hunt after TP: beyond target | Hunt after SL: kept going / bounced | Chop after TP: beyond target | Chop after SL: kept going / bounced |
+|---|---|---|---|---|
+| 2019-21 | 4.14 ATR | 3.89 / 3.51 ATR | 1.03R | 2.80R / 1.15R |
+| 2022-25 | 3.99 ATR | 3.61 / 4.14 ATR | 2.00R | 2.37R / 1.32R |
+| 2025-26 | 5.06 ATR | 3.91 / 4.59 ATR | 1.33R | 2.92R / 1.12R |
+
+Read:
+- Hunt after TP and after SL look alike (about 4 ATR further each way). A 24h window is long next to a 1.5 ATR stop, so these mostly show BTC's normal daily range, not anything specific to Hunt. A random-time baseline and shorter windows (2h, 4h) are needed to say more.
+- After a Hunt SL, price got back to entry in 24h in 80-81% of cases and reached the original target in 44-54%. After a Hunt TP it came all the way back to entry in 63-67%.
+- Chop is consistent across all three files: after a chop SL (close through the line) price kept going past it about 2.4-2.9R, about twice the bounce back (1.1-1.3R), and the target was reached only 3-5% of the time. After a chop TP the move continued 1.0-2.0R and only 12-22% came back to entry. Chop stops look like real breakouts.
+- In ATR, the Hunt swing run is stable across eras (median about 1.3-1.4 ATR, p90 about 3.7-4.2 ATR). Price distances grow with BTC's price level.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
