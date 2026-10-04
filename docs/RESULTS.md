@@ -306,6 +306,33 @@ Read:
 - Choosing among 16 exits on three files has some selection risk; the exit families are simple and the pattern repeats across files.
 - Still to do: run the chosen exit inside the full Hunt V3 sequence (one position, chop, new entries after shorter trades).
 
+## Eye v2: two zones with floors (Hunt V3 Hunt trades, same entries)
+
+Run with `scripts/test_hunt_eye2.py`. TP fixed at 2.5 ATR, stop 1.5 ATR. Zone B: best price 1.5-2.0 ATR, close at least +1R. Zone A: best price 2.0 ATR and up, close at least +2.0 ATR. "Cushion" arms the 1R floor at 1.75 ATR and the 2.0 ATR floor at 2.25 ATR, so a floor is not hit by the first pullback. The eye adds an early exit (closed 15m candle rules, and the forming candle on each 1m close: pullback of pb ATR from the best price, or a sell candle).
+
+Avg R / total R / dip:
+
+| Exit | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| base 2.5 (Hunt V3 now) | +0.117 / +161 / -23.7 | +0.184 / +422 / -18.3 | +0.168 / +145 / -18.2 |
+| target 2.0 | +0.125 / +171 / -24.4 | +0.170 / +389 / -18.5 | +0.165 / +143 / -12.8 |
+| target 1.5 | +0.117 / +162 / -22.4 | +0.141 / +324 / -16.2 | +0.148 / +128 / -12.0 |
+| floor 2.0 + eye .2 | +0.137 / +189 / -23.3 | +0.175 / +401 / -17.6 | +0.178 / +154 / -11.3 |
+| zones + eye .2 (no cushion) | +0.130 / +180 / -21.8 | +0.160 / +367 / -15.9 | +0.179 / +155 / -11.4 |
+| **zones cushion, floors only** | +0.134 / +185 / -24.6 | +0.180 / +412 / -15.1 | +0.181 / +156 / -11.9 |
+| zones cushion + eye .1 | +0.126 / +173 / -24.2 | +0.157 / +359 / -15.9 | +0.159 / +137 / -12.8 |
+| zones cushion + eye .2 | +0.123 / +169 / -24.4 | +0.156 / +359 / -15.8 | +0.161 / +139 / -12.8 |
+| zones cushion + eye .25 | +0.123 / +169 / -24.8 | +0.156 / +358 / -15.8 | +0.163 / +140 / -12.5 |
+
+Total R / dip: base 6.8 / 23.1 / 8.0; zones cushion floors only 7.5 / 27.3 / 13.1; floor 2.0 + eye .2 8.1 / 22.8 / 13.6.
+
+Read:
+- The floors do the work, not the eye. Zones cushion with floors only keeps avg R and total R about the same (+8%, +15%, -2% total R) and cuts the dip on 2022-25 (-17%) and 2025-26 (-35%); on 2019-21 the dip is slightly worse (-24.6 vs -23.7). R/dip is better on all three files.
+- Adding the eye's early exit on top lowers avg R on all three files (for example +0.181 to +0.161 on 2025-26) because it sells trades that would have kept running.
+- Stops fall from 455 to 369 (2025-26), 768 to 624 (2019-21), 1206 to 988 (2022-25): the floors turn many -1R trades into about +1R or better.
+- Reporting issues in this run: the "reached 2.5 ATR 0" figure and the "wins >= 1R" counts were wrong (the best price was not updated on the exit bar, and a 1R floor fill nets about +0.97R). The script is fixed; avg R, total R and dip are not affected. True reach counts from the other rows: 62% / 59% / 61% of trades reach 1.5 ATR, about 54% reach 2.0 ATR, about 47% reach 2.5 ATR.
+- Still to do: put the floors inside the full Hunt V3 sequence (one position, chop, new entries after shorter trades).
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.

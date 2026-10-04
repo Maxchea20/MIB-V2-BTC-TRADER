@@ -92,9 +92,11 @@ def replay(bars, i, trade, cfg):
             break
         if lo <= stop_p:
             price, reason = stop_p, ("FLOOR" if stop_p > sign * stop else "SL")
+            best = max(best, hi)
             break
         if hi >= e + target * atr:
             price, reason = e + target * atr, "TP"
+            best = max(best, hi)
             break
         if hi > best:
             best = hi
@@ -141,11 +143,11 @@ def main():
         for _, why, _ in out:
             counts[why] = counts.get(why, 0) + 1
         why = " ".join(f"{k}{counts[k]}" for k in ("TP", "FLOOR", "EYE-C", "EYE-F", "SL", "TIME") if k in counts)
-        big = sum(r >= 1.0 for r in rs)
+        big = sum(r >= 0.95 for r in rs)
         if label == "base 2.5":
             reach = {lvl: sum(m >= lvl for _, _, m in out) for lvl in (1.0, 1.5, 2.0, 2.5)}
             print("  reached before the trade ended: " + "  ".join(f"{lvl} ATR {n} ({n / len(out):.0%})" for lvl, n in reach.items()))
-        print(f"  {label:<18} avg {sum(rs) / len(rs):+.3f}R total {sum(rs):+.0f}R dip {dip:.1f}R  wins>=1R {big}  | {why}")
+        print(f"  {label:<18} avg {sum(rs) / len(rs):+.3f}R total {sum(rs):+.0f}R dip {dip:.1f}R  wins>=0.95R {big}  | {why}")
 
 
 if __name__ == "__main__":
