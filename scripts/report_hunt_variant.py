@@ -22,6 +22,7 @@ from btc_research.data.loader import load_bars
 from btc_research.setups import hunt_exits
 
 U = 1.5
+FUNDING = 0.000026  # +0.0026% per 8 hours, from the exchange screen
 COLUMNS = (("today", 1.0, 5 / 3, False), ("V4 exit", 1.0, 5 / 3, True), ("2.5R + floors", 1.0, 2.5, True))
 
 
@@ -43,7 +44,8 @@ def run(bars, trades, sl_r, tp_r, floors):
         if done is None:
             done = hunt_exits._close(trade, bars[-1].close, bars[-1].open_time, "END")
         fee_r = (entry + done["exit"]) * 0.0002 / done["risk"]
-        out.append({"r": done["r_multiple"], "reason": done["exit_reason"], "t0": int(t["entry_time"]), "t1": done["exit_time"], "fee_r": fee_r})
+        out.append({"r": done["r_multiple"], "reason": done["exit_reason"], "t0": int(t["entry_time"]), "t1": done["exit_time"], "fee_r": fee_r,
+                    "side": t["side"], "risk_pct": done["risk"] / entry})
     return out
 
 
@@ -94,6 +96,8 @@ def summarize(rows, risk):
         ("longest losing streak", f"{longest} trades"),
         ("profitable months", f"{sum(v > 0 for v in months.values())} of {len(months)}  (worst {min(months.values()):+.0f}R, best {max(months.values()):+.0f}R)"),
         ("avg per trade if fee is", " / ".join(f"{(total + sum(x['fee_r'] for x in rows) * (1 - bp / 2)) / len(rs):+.3f}R at {bp:g}bp" for bp in (0, 1, 3, 4))),
+        ("avg if TP exits are maker 0%", f"{(total + sum(x['fee_r'] / 2 for x in rows if x['reason'] == 'TARGET')) / len(rs):+.3f}R  (limit order at the target; entry and stops stay taker 0.02%)"),
+        ("funding effect", f"{-sum(FUNDING * ((x['t1'] - x['t0']) / 3_600_000 / 8) / x['risk_pct'] * (1 if x['side'] == 'LONG' else -1) for x in rows) / len(rs):+.4f}R per trade  (+0.0026% per 8h, longs pay, shorts receive)"),
         ("fees paid", f"{sum(x['fee_r'] for x in rows):.0f}R  ({sum(x['fee_r'] for x in rows) / len(rs):.3f}R per trade)"),
         ("exits: TP / floor / stop", f"{mix['TARGET']} / {mix['FLOOR']} / {mix['STOP']}" + (f" (+{mix['END']} open at the end)" if mix["END"] else "")),
     ]
