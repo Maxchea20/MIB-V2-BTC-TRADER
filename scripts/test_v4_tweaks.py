@@ -5,6 +5,8 @@ worst two hour blocks in all three files. Each variant rebuilds the one-position
   no chop            Hunt outside the box only
   no 04-08h          no entries (Hunt or chop) from 04:00 to 08:00 UTC
   chop min risk X%   chop trades only when the stop is at least X% of price away (a tight stop makes the fee big in R)
+  chop max width X%  chop trades only when the box is no wider than X% of price (the chop trades inside the 2025-26 drops sat in boxes
+                     6-9% wide, against about 5% normally)
   chop half          chop trades at half size
 Usage: py scripts\\test_v4_tweaks.py research_2022_25
 """
@@ -55,6 +57,8 @@ def variants(kept, chop, one_position):
     out["no chop, no 04-08h"] = one_position([t for t in kept if no_asia(t)], [])
     for pct in (0.003, 0.005):
         out[f"chop min risk {pct:.1%}"] = one_position(kept, [t for t in chop if t["risk"] / t["entry"] >= pct])
+    for cap in (0.06, 0.07):
+        out[f"chop max width {cap:.0%}"] = one_position(kept, [t for t in chop if (t["line_high"] - t["line_low"]) / t["entry"] <= cap])
     half = one_position(kept, chop)
     out["chop half"] = [dict(t, r_multiple=float(t["r_multiple"]) * (0.5 if t["book"] == "CHOP" else 1.0)) for t in half]
     return out
