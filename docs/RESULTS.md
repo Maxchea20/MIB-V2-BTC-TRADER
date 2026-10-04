@@ -266,6 +266,46 @@ Read:
 - The 24h after-SL study (price kept going about 2.4-2.9R past the chop stop, twice the bounce) was a maximum-excursion measure with no stop and no entry delay. Once the trade enters after the break candle closes and has a stop, the edge is gone.
 - Not run on 2019-21 or 2022-25. Three losing versions on one file is not a reason to spend more runs.
 
+## Hunt V3 Hunt trades with different exits (same entries)
+
+Run with `scripts/test_hunt_exits.py`. Same entries, stop 1.5 ATR, fee 2 bp a side per fill. Header check passed on all three files (file average vs "base 2.5" replay: +0.171/+0.168, +0.119/+0.117, +0.183/+0.184). Total R / dip is R/dip. Entries are fixed, so extra trades from shorter exits are not counted.
+
+| Exit | 2019-21 avg / total / dip | 2022-25 avg / total / dip | 2025-26 avg / total / dip |
+|---|---|---|---|
+| base 2.5 (Hunt V3 now) | +0.117 / +161 / -23.7 | +0.184 / +422 / -18.3 | +0.168 / +145 / -18.2 |
+| target 1.0 | +0.116 / +160 / -12.1 | +0.135 / +310 / -11.2 | +0.124 / +107 / -11.1 |
+| target 1.5 | +0.117 / +162 / -22.4 | +0.141 / +324 / -16.2 | +0.148 / +128 / -12.0 |
+| half@1.0, stop to entry | +0.114 / +157 / -13.7 | +0.149 / +342 / -11.3 | +0.149 / +129 / -9.5 |
+| half@1.0, stop stays | +0.116 / +160 / -14.5 | +0.160 / +366 / -12.1 | +0.146 / +126 / -9.9 |
+| half@1.4, stop to entry | +0.113 / +155 / -18.4 | +0.156 / +358 / -16.5 | +0.163 / +141 / -11.2 |
+| trail 1.4/1.0 | +0.109 / +150 / -25.8 | +0.160 / +368 / -15.8 | +0.161 / +139 / -11.0 |
+| giveback 40% | +0.117 / +161 / -22.8 | +0.162 / +371 / -15.1 | +0.171 / +148 / -10.9 |
+| eye structure | +0.114 / +157 / -22.7 | +0.167 / +383 / -16.3 | +0.167 / +144 / -13.3 |
+| eye stall | +0.129 / +178 / -21.2 | +0.173 / +396 / -15.6 | +0.171 / +148 / -12.3 |
+| eye reversal | +0.120 / +164 / -27.0 | +0.166 / +380 / -16.1 | +0.175 / +151 / -10.7 |
+| eye any | +0.116 / +160 / -26.1 | +0.167 / +383 / -15.7 | +0.175 / +151 / -10.4 |
+| eye hold 0.7 | +0.117 / +161 / -26.8 | +0.152 / +348 / -15.5 | +0.153 / +133 / -12.0 |
+| eye hold 1.0 | +0.104 / +143 / -26.4 | +0.155 / +355 / -15.3 | +0.173 / +149 / -11.1 |
+
+R/dip (total R / dip) for the main candidates:
+
+| Exit | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| base 2.5 | 6.8 | 23.1 | 8.0 |
+| half@1.0, stop to entry | **11.5** | **30.3** | **13.6** |
+| half@1.0, stop stays | 11.0 | 30.2 | 12.7 |
+| target 1.0 | 13.2 | 27.7 | 9.6 |
+| giveback 40% | 7.1 | 24.6 | 13.6 |
+| eye stall | 8.4 | 25.4 | 12.0 |
+| eye any | 6.1 | 24.4 | 14.5 |
+
+Read:
+- No exit raises average R or total R in a way beyond noise. Past +1 ATR a trade behaves like a coin flip, so catching the 1.4-2.5 ATR trades also gives up the bigger winners.
+- Early profit-taking (sell half at 1 ATR, or a 1 ATR target) cuts the dip by 35-50% on all three files, at a cost of 0-19% of total R. R/dip improves on all three files. It is the most consistent result.
+- The eye rules do not beat the simple ones. Eye any/reversal cut the dip on 2022-25 and 2025-26 but make it worse on 2019-21. Eye stall (1h with no new best, after +1.4 ATR) is the steadiest eye rule: dip lower on all three files, total R +10%, -6%, +2%.
+- Choosing among 16 exits on three files has some selection risk; the exit families are simple and the pattern repeats across files.
+- Still to do: run the chosen exit inside the full Hunt V3 sequence (one position, chop, new entries after shorter trades).
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
