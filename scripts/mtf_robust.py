@@ -1,7 +1,7 @@
 """Is the real-fill swing breakout robust, or did we just pick a lucky setting?
 Signal: 15m close beyond the prior 20-bar high (long) / low (short), both sides, entry = market order at the next 1m open. Stop = SL x 4h ATR, target = TPR x stop.
 Grid: gates (4h+1h released, or 1h released with the 4h trend kept) x stop size SL x target TPR. Each row: trades, avg R, total R, worst dip, and how many calendar years are positive.
-Then a cost stress on the main setting: fee 2 bp -> 4 bp a side (the docs baseline), slippage 0.5 bp -> 2 bp.
+Then a cost stress on stop 2.0 ATR / target 5R: fee 2 bp -> 4 bp a side (the docs baseline), slippage 0.5 bp -> 2 bp.
 A real edge should look similar in the neighbouring cells, not live in one cell.
 Usage: py scripts\\mtf_robust.py [backend\\research_2022_25.db]
 """
@@ -20,9 +20,9 @@ from btc_research.data.resample import resample
 from btc_research.setups.mtf_stack import run_mtf
 
 BASE = json.loads((ROOT / "config" / "experiments" / "exp-mtf-open-bothany-4R.json").read_text())
-GATES = (("both released", "any", "any"), ("1h released, 4h trend kept", "trend", "any"))
-SLS = (1.0, 1.5, 2.0)
-TPRS = (2, 3, 4, 5, 6)
+GATES = (("1h released, 4h trend kept", "trend", "any"), ("both released", "any", "any"))
+SLS = (1.5, 2.0, 2.5, 3.0)
+TPRS = (3, 4, 5, 6)
 
 
 def stats(trades):
@@ -58,9 +58,10 @@ def main():
         for sl in SLS:
             for tpr in TPRS:
                 print(f"  stop {sl:.1f} ATR  target {tpr}R  " + stats(run(h4_gate=g4, h1_gate=g1, sl_atr=sl, tp_atr=sl * tpr)))
-    print("\ncost stress, both released, stop 1.5 ATR, target 4R")
-    for label, kw in (("as tested (fee 2bp, slip 0.5bp)", {}), ("fee 4bp", {"fee_bps_per_side": 4.0}), ("slip 2bp", {"slippage_bps": 2.0}), ("fee 4bp + slip 2bp", {"fee_bps_per_side": 4.0, "slippage_bps": 2.0})):
-        print(f"  {label:<34}" + stats(run(h4_gate="any", h1_gate="any", sl_atr=1.5, tp_atr=6.0, **kw)))
+    print("\ncost stress, stop 2.0 ATR, target 5R")
+    for label, g4 in (("1h released, 4h trend kept", "trend"), ("both released", "any")):
+        for tag, kw in (("as tested", {}), ("fee 4bp", {"fee_bps_per_side": 4.0}), ("fee 4bp + slip 2bp", {"fee_bps_per_side": 4.0, "slippage_bps": 2.0})):
+            print(f"  {label:<28} {tag:<20}" + stats(run(h4_gate=g4, h1_gate="any", sl_atr=2.0, tp_atr=10.0, **kw)))
 
 
 if __name__ == "__main__":
