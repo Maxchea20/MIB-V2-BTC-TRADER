@@ -20,7 +20,7 @@ from btc_research.config import research_db_path
 from btc_research.data.loader import load_bars
 from btc_research.setups import hunt_exits
 
-COMBOS = ((1.0, 5 / 3), (1.0, 2.0), (1.0, 3.0), (1.5, 3.0), (1.5, 4.5), (2.0, 4.0))
+COMBOS = ((1.0, 5 / 3), (1.0, 2.0), (1.0, 2.5), (1.0, 3.0), (1.0, 4.0), (1.5, 3.0), (1.5, 4.5), (2.0, 4.0))
 U = 1.5  # one R of today = 1.5 ATR, the unit hunt_exits works in
 
 
