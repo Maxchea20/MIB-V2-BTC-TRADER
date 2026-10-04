@@ -12,6 +12,8 @@ Schemes (ATR from entry; stop is always 1.5 ATR first):
               stall     = 4 closed 15m candles with no new best price (1 hour)
               reversal  = a 15m candle with a body over half its range, closing in its bottom third against the trade
               any       = any of the three
+  eye hold    lets price hover sideways for as long as it likes. Exits only when a closed 15m candle ends
+              more than 0.7 (or 1.0) ATR below the best price, so a pause is fine and a drop is not
 Stop wins when a bar touches the stop and a level. Fee 2 bp a side on each fill. Max hold 3 days.
 Usage: py scripts\\test_hunt_exits.py research_2022_25
 """
@@ -43,6 +45,8 @@ SCHEMES = [
     ("eye stall", dict(target=2.5, eye="stall", arm_eye=1.4)),
     ("eye reversal", dict(target=2.5, eye="rev", arm_eye=1.4)),
     ("eye any", dict(target=2.5, eye="any", arm_eye=1.4)),
+    ("eye hold 0.7", dict(target=2.5, eye="hold", arm_eye=1.4, hold=0.7)),
+    ("eye hold 1.0", dict(target=2.5, eye="hold", arm_eye=1.4, hold=1.0)),
 ]
 
 
@@ -88,7 +92,9 @@ def replay(bars, i, trade, cfg):
             if cur is not None and cur["key"] != key:
                 candles.append(cur)
                 armed = best >= e + cfg["arm_eye"] * atr
-                if armed and _eye_fires(eye, candles, last_high_idx):
+                if armed and eye == "hold":
+                    pending = best - candles[-1]["cl"] > cfg["hold"] * atr
+                elif armed and _eye_fires(eye, candles, last_high_idx):
                     pending = True
                 cur = None
             if cur is None:
