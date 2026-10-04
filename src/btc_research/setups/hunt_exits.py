@@ -14,6 +14,8 @@ MODES = {
     # floors with no cushion, plus the eye from 1.5 ATR on
     "eye2": dict(tiers=((1.5, 1.5), (2.0, 2.0)), arm=1.5, closed=True, forming=True, pb=0.2),
 }
+# Options for a mode dict passed to walk(): notarget=True removes the 2.5 ATR target;
+# trail=(arm_atr, dist_atr) trails the best price by dist_atr once it is arm_atr in favor.
 FIFTEEN = 900_000
 
 
@@ -33,7 +35,7 @@ def _closed_fires(candles, last_high_idx):
 
 def walk(trade, bars, start, end, mode):
     """Walk the 1m bars from `start`. Returns the trade with exit fields set, or None if still open at `end`."""
-    cfg = MODES[mode]
+    cfg = mode if isinstance(mode, dict) else MODES[mode]
     sign = 1 if trade["side"] == "LONG" else -1
     entry, stop, target = trade["entry"], trade["stop"], trade["target"]
     atr = trade["atr"]
@@ -67,11 +69,14 @@ def walk(trade, bars, start, end, mode):
             return _close(trade, sign * op, bar.open_time, "EYE")
         if lo <= stop_p:
             return _close(trade, sign * stop_p, bar.open_time, "FLOOR" if stop_p > base_stop else "STOP")
-        if hi >= target_p:
+        if not cfg.get("notarget") and hi >= target_p:
             return _close(trade, target, bar.open_time, "TARGET")
         if hi > best:
             best = hi
             last_high_idx = len(candles)
+        trail = cfg.get("trail")
+        if trail and best >= e + trail[0] * atr:
+            stop_p = max(stop_p, best - trail[1] * atr)
         for arm_level, floor_level in cfg["tiers"]:
             if best >= e + arm_level * atr:
                 stop_p = max(stop_p, e + floor_level * atr)

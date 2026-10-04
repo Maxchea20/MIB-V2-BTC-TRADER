@@ -77,6 +77,21 @@ class HuntExitsTest(unittest.TestCase):
         self.assertEqual(done["exit_reason"], "FLOOR")
         self.assertGreater(done["r_multiple"], 1.2)
 
+    def test_trail_without_target_lets_a_run_go(self):
+        # runs to about +4R, then falls back: with no target and a 1R trail it sells near +3R, not at +1.67R
+        bars, price = [], 100.0
+        steps = [0.1] * 60 + [-0.1] * 100
+        for i, d in enumerate(steps):
+            o = price
+            price += d
+            bars.append(Bar(i * 60_000, i * 60_000 + 60_000, o, max(o, price) + 0.01, min(o, price) - 0.01, price, 1.0))
+        trade = {"side": "LONG", "entry": 100.0, "stop": 98.5, "target": 102.5, "atr": 1.0, "risk": 1.5, "entry_time": 0}
+        cfg = dict(tiers=(), notarget=True, trail=(0.0, 1.5))
+        done = hunt_exits.walk(dict(trade), bars, 0, bars[-1].open_time + 60_000, cfg)
+        self.assertGreater(done["r_multiple"], 2.5)
+        capped = hunt_exits.walk(dict(trade), bars, 0, bars[-1].open_time + 60_000, dict(tiers=()))
+        self.assertEqual(capped["exit_reason"], "TARGET")
+
 
 if __name__ == "__main__":
     unittest.main()
