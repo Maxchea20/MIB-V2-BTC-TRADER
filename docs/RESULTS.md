@@ -458,6 +458,23 @@ Read:
 - 04-08h UTC is among the two worst hour blocks in all three worst drops, matching the earlier feature scan.
 - Next: `scripts/test_v4_tweaks.py` (no chop, no 04-08h entries, chop with a minimum stop distance, chop at half size).
 
+## Hunt V4 drops: what the trades did (path forensic, all three files)
+
+Run with `scripts/forensic_v4_paths.py`. "Drop 1/2/3" are the three worst drawdowns of each file (the dates are in the forensic table above). "Rest" is every other trade in the same file.
+
+Hunt trades inside the 9 drops vs the rest of the file:
+- Stopped out: 55-62% in 2019-21 (rest 46-47%), 51-61% in 2022-25 (rest 44%), 58-62% in 2025-26 (rest 43-44%). Higher in all nine drops.
+- Floors: lower than the rest (25-40% vs 42-43%) in all nine drops except one that is level (2022-25 drop 1, 40% vs 42%).
+- Stopped trades that got +1.5 ATR before the stop: 3, 11, 14, 5, 5, 4, 3, 11, 10% (rest about 10%). No consistent U-turn from near TP; the loss is more trades failing early.
+- Stopped trades that never got +0.5 ATR: 26-48% in the drops vs 27-31% in the rest.
+
+Chop trades inside the 9 drops (61 trades, 1 win; the rest of each file wins 16-31%):
+- They entered at their own line (median position 0.09-0.24 where 0 = at the line and 1 = the far line). 0% to 20% were in the middle of the box (0.25-0.75).
+- Box width is not a consistent cause. 2025-26: wider than normal (8.6% and 6.3% vs 4.9%). 2022-25: 5.4%, 2.2%, 10.7% vs 6.6%. 2019-21: 5.2%, 9.9%, 6.4% vs 8.4%.
+- Stop distance was unusually tight in two 2019-21 drops (0.37% and 0.56% vs about 1.1%), which makes the fee large in R and the loss bigger than 1R.
+- The drops are windows picked because the account fell, so some of the lack of chop wins is selection. Chop and Hunt still fail together.
+- Idea to test next: a stop-rate rule (half size while 60% or more of the last 40 trades were stopped out). It is in `scripts/diagnose_hunt_drawdown.py` as "stop-rate" and "both".
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.

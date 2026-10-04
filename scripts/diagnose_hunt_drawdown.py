@@ -7,6 +7,8 @@ Reads the newest `floors` Hunt trade file for the period (run scripts\\run_floor
     day cap     no new trade for the rest of the UTC day once the day is down 3R
     pause       after 4 losses in a row, skip trades for 12 hours
     throttle    half size while the equity is 10R or more below its peak
+    stop-rate   half size while 60% or more of the last 40 trades were stopped out (normal is about 45%)
+    both        half size when either of the two above is on
   and on A only: box half (trades inside the box at half size) and box half + throttle
 Usage: py scripts\\diagnose_hunt_drawdown.py research_2022_25
 """
@@ -103,6 +105,22 @@ def _throttle(rows, depth=10.0, size=0.5):
     return out
 
 
+def _sizing(rows, depth=10.0, window=40, level=0.60, use_equity=True, use_stops=True):
+    """rows are (time, r, was_stopped). Half size on the next trade when a risk signal is on. Signals read only past trades."""
+    eq = peak = 0.0
+    recent = []
+    out = []
+    for t, r, stopped in rows:
+        stop_on = use_stops and len(recent) >= window and sum(recent[-window:]) / window >= level
+        eq_on = use_equity and peak - eq >= depth
+        k = 0.5 if (stop_on or eq_on) else 1.0
+        eq += r * k
+        peak = max(peak, eq)
+        out.append(r * k)
+        recent.append(1 if stopped else 0)
+    return out
+
+
 def main():
     name = sys.argv[1]
     folder = ROOT / "results" / "exp-hunt-desktop-cfi-floors"
@@ -119,11 +137,13 @@ def main():
         i = bisect.bisect_right(keys, ts - 3_600_000)  # only a 1h bar that has closed by ts
         return bool(i and active[keys[i - 1]] is not None)
 
-    rows = [(int(t["entry_time"]), float(t["r_multiple"]), in_box(int(t["entry_time"]))) for t in trades]
+    rows = [(int(t["entry_time"]), float(t["r_multiple"]), in_box(int(t["entry_time"])), t["exit_reason"] == "STOP") for t in trades]
     rows.sort()
-    a = [(t, r) for t, r, _ in rows]
-    b = [(t, r) for t, r, box in rows if not box]
-    c = [(t, r) for t, r, box in rows if box]
+    a = [(t, r) for t, r, _, _ in rows]
+    b = [(t, r) for t, r, box, _ in rows if not box]
+    c = [(t, r) for t, r, box, _ in rows if box]
+    a_s = [(t, r, st) for t, r, _, st in rows]
+    b_s = [(t, r, st) for t, r, box, st in rows if not box]
     print(f"{name} Hunt alone with floors ({files[-1].parent.name})")
     print("  A all trades      " + _stats([r for _, r in a]))
     print("  B outside the box " + _stats([r for _, r in b]) + "   (Hunt V3's Hunt book, no chop)")
@@ -134,13 +154,15 @@ def main():
     losses = [r < 0 for _, r in a]
     after3 = [losses[i] for i in range(3, len(losses)) if all(losses[i - 3:i])]
     print(f"  loss clustering: {sum(losses) / len(losses):.0%} of trades lose; after 3 losses in a row {sum(after3) / len(after3):.0%} lose (n={len(after3)})")
-    half = [(t, r * (0.5 if box else 1.0)) for t, r, box in rows]
-    for label, rows_ in (("A", a), ("B", b)):
+    half = [(t, r * (0.5 if box else 1.0)) for t, r, box, _ in rows]
+    for label, rows_, rows_s in (("A", a, a_s), ("B", b, b_s)):
         print(f"  risk rules on {label}:")
         print("    none      " + _stats([r for _, r in rows_]))
         print("    day cap   " + _stats(_day_cap(rows_)))
         print("    pause     " + _stats(_pause(rows_)))
         print("    throttle  " + _stats(_throttle(rows_)))
+        print("    stop-rate " + _stats(_sizing(rows_s, use_equity=False)))
+        print("    both      " + _stats(_sizing(rows_s)))
         if label == "A":
             print("    box half  " + _stats([r for _, r in half]))
             print("    box half + throttle " + _stats(_throttle(half)))
