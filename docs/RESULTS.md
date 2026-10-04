@@ -179,6 +179,25 @@ Read:
 - Event, gate, weather, side, volatility and weekday: nothing consistent across files.
 - Weak negatives: 04-08h UTC is below average on all three (-0.05, 0.00, +0.15R).
 
+## Hunt V3 with Hunt limited to 12-16h UTC (chop any hour)
+
+Run with `scripts/run_hours_test.py`. The 12-16h bucket was found by scanning these same three files, so the gain is in-sample.
+
+| File | Strategy | Trades | Avg R | Total R | Max dip | R/dip |
+|---|---|---|---|---|---|---|
+| 2019-21 | Hunt V3 | 1526 | +0.152 | +231 | -40.9 | 5.7 |
+| | Hunt only 12-16h | 450 (Hunt 257 / chop 193) | +0.351 | +158 | -22.1 | **7.2** |
+| 2022-25 | Hunt V3 | 2549 | +0.208 | +531 | -23.8 | **22.3** |
+| | Hunt only 12-16h | 826 (Hunt 495 / chop 331) | +0.322 | +266 | -25.9 | 10.3 |
+| 2025-26 | Hunt V3 | 950 | +0.191 | +182 | -15.8 | **11.5** |
+| | Hunt only 12-16h | 310 (Hunt 201 / chop 109) | +0.380 | +118 | -17.4 | 6.8 |
+
+Read:
+- Avg R per trade rises on all three files (+0.20, +0.11, +0.19R).
+- Total R falls 32%, 50% and 35%. The dip is much better on 2019-21 and slightly worse on the other two. R/dip is better only on 2019-21.
+- So 12-16h makes each trade better but does not beat Hunt V3 per unit of risk. It would matter more if live costs per trade turn out higher than the 2 bp fee modeled here.
+- Chop trades taken rise (86 to 109, 150 to 193, 255 to 331) because Hunt blocks it less.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
