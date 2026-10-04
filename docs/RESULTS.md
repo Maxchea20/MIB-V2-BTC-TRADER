@@ -333,6 +333,34 @@ Read:
 - Reporting issues in this run: the "reached 2.5 ATR 0" figure and the "wins >= 1R" counts were wrong (the best price was not updated on the exit bar, and a 1R floor fill nets about +0.97R). The script is fixed; avg R, total R and dip are not affected. True reach counts from the other rows: 62% / 59% / 61% of trades reach 1.5 ATR, about 54% reach 2.0 ATR, about 47% reach 2.5 ATR.
 - Still to do: put the floors inside the full Hunt V3 sequence (one position, chop, new entries after shorter trades).
 
+## Floors inside the full engine (real entry order, one position, chop book)
+
+Run with `scripts/run_floor_v3.py <file> floors`. Floors: stop moves to +1R (1.5 ATR) once the best price reaches 1.75 ATR, and to +2.0 ATR once it reaches 2.25 ATR. TP stays 2.5 ATR, stop 1.5 ATR. Code: `src/btc_research/setups/hunt_exits.py`, tested against the replay (`tests/test_hunt_exits.py`). Closing trades sooner frees the engine, so it takes about 30% more trades.
+
+| File | Strategy | Trades | Avg R | Total R | Dip | R/dip |
+|---|---|---|---|---|---|---|
+| 2019-21 | Hunt alone, now | 3620 | +0.108 | +392 | -26.6 | 14.7 |
+| | Hunt alone, floors | 4901 | +0.109 | +536 | -28.5 | 18.8 |
+| | Hunt V3, now | 1526 | +0.152 | +231 | -40.9 | 5.7 |
+| | **Hunt V3, floors** | 1976 (Hunt 1799 / chop 177) | +0.133 | **+263** | **-28.1** | **9.4** |
+| 2022-25 | Hunt alone, now | 6427 | +0.124 | +798 | -27.9 | 28.7 |
+| | Hunt alone, floors | 8773 | +0.132 | +1155 | -41.4 | 27.9 |
+| | Hunt V3, now | 2549 | +0.208 | +531 | -23.8 | 22.3 |
+| | **Hunt V3, floors** | 3353 (Hunt 3067 / chop 286) | +0.211 | **+709** | **-19.6** | **36.1** |
+| 2025-26 | Hunt alone, now | 1981 | +0.106 | +211 | -32.3 | 6.5 |
+| | Hunt alone, floors | 2655 | +0.122 | +325 | -28.9 | 11.3 |
+| | Hunt V3, now | 950 | +0.191 | +182 | -15.8 | 11.5 |
+| | **Hunt V3, floors** | 1211 (Hunt 1121 / chop 90) | +0.188 | **+228** | -21.2 | 10.7 |
+
+Hunt V3 with floors vs Hunt V3 now:
+- Total R is higher on all three files: +14%, +34%, +25%.
+- Dip is better on two files (-40.9 to -28.1, -23.8 to -19.6) and worse on 2025-26 (-15.8 to -21.2).
+- R/dip is higher on two files (+65%, +62%) and about equal on 2025-26 (-7%).
+- Avg R per trade is about the same (-0.019, +0.003, -0.003). The gain comes from about 30% more trades.
+- At $50 risk, R per year (Hunt V3 now to floors): 2019-21 115R to 131R ($5,800 to $6,600); 2022-25 145R to 193R ($7,200 to $9,700); 2025-26 169R to 211R ($8,500 to $10,600).
+- Worst dip at $50: $1,405 / $980 / $1,060 (now: $2,045 / $1,190 / $790).
+- Not yet tested: eye2 in the engine (only floors), fee and slippage stress, and live order handling.
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.
