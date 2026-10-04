@@ -15,6 +15,7 @@ from btc_research.data.resample import resample
 from btc_research.market_structure.failed_push_range import detect_push_range
 
 HOUR = 3_600_000
+REAL_STOP = False  # True: a stop is booked at the close of the bar that closed through the line (minus slippage), not at the line
 FIELDS = ("book", "side", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl")
 
 
@@ -196,9 +197,12 @@ def _walk(trade, series, start):
         if not broke and not target_hit:
             continue
         price = trade["stop"] if broke else trade["target"]
+        if REAL_STOP and broke:
+            slip = 0.1 + bar.close * 0.00005
+            price = bar.close - slip if trade["side"] == "LONG" else bar.close + slip
         gross = price - trade["entry"] if trade["side"] == "LONG" else trade["entry"] - price
         trade["exit"] = price
-        trade["exit_time"] = bar.open_time
+        trade["exit_time"] = bar.open_time + (HOUR if REAL_STOP else 0)
         trade["exit_reason"] = "STOP" if broke else "TARGET"
         trade["net_pnl"] = trade["net_pnl"] if "net_pnl" in trade and trade.get("book") == "HUNT" else gross - (trade["entry"] + price) * 0.0002
         trade["r_multiple"] = trade["net_pnl"] / trade["risk"] if trade.get("book") != "HUNT" else float(trade["r_multiple"])
