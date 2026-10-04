@@ -66,6 +66,12 @@ def main() -> None:
         "exp-mtf-touch-15m",
         "exp-mtf-touch-4h-2R",
         "exp-mtf-touch-4h-4R",
+        "exp-mtf-open-4hany-2R",
+        "exp-mtf-open-1hany-2R",
+        "exp-mtf-open-bothany-2R",
+        "exp-mtf-open-4hany-4R",
+        "exp-mtf-open-1hany-4R",
+        "exp-mtf-open-bothany-4R",
     }
     if args.experiment not in allowed:
         raise SystemExit("Unknown experiment.")

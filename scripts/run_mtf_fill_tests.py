@@ -12,11 +12,12 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NAMES = ["exp-mtf-4h-1h-15m-v1"] + [f"exp-mtf-{m}-{t}" for m in ("nextopen", "touch") for t in ("15m", "4h-2R", "4h-4R")]
+GATES = [f"{k}-{t}" for t in ("2R", "4R") for k in ("exp-mtf-open-4hany", "exp-mtf-open-1hany", "exp-mtf-open-bothany")]
 
 
 def main():
-    db = sys.argv[1:]
-    for name in NAMES:
+    db = [a for a in sys.argv[1:] if a != "--gates"]
+    for name in (GATES if "--gates" in sys.argv else NAMES):
         cmd = [sys.executable, str(ROOT / "scripts" / "backtest.py"), "--experiment", name] + (["--db", db[0]] if db else [])
         out = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT).stdout
         try:

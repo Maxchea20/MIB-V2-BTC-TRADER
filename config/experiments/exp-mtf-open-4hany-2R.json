@@ -1,0 +1,30 @@
+{
+  "experiment_id": "exp-mtf-open-4hany-2R",
+  "family": "MTF",
+  "description": "MTF real fill (next 1m open), 4h gate=any, 1h gate=break, stop 1.5 x 4h ATR, target 3.0 x 4h ATR",
+  "symbol": "BTC_USDT",
+  "sides": [
+    "LONG",
+    "SHORT"
+  ],
+  "lookback_4h": 20,
+  "lookback_1h": 20,
+  "lookback_15": 20,
+  "atr_period": 14,
+  "sl_atr": 1.5,
+  "tp_atr": 3.0,
+  "quiet_minutes": 15,
+  "fee_bps_per_side": 2.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true,
+  "fill_mode": "next_open",
+  "atr_tf": "4h",
+  "h4_gate": "any",
+  "h1_gate": "break"
+}

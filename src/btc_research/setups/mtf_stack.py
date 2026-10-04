@@ -19,6 +19,11 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
     # fill_mode "next_open": same signal, but the fill is the first 1m open after the 15m bar closes (what you can really get).
     # fill_mode "touch": no wait for the 15m close; a resting stop order at the level fills on the first touch in the bar (every touch counts, including ones that reverse).
     fill_mode = cfg.get("fill_mode", "legacy")
+    # h4_gate "trend" (default): the 4h close vs 20 bars earlier sets the only allowed side. "any": no 4h filter, both sides allowed.
+    # h1_gate "break" (default): the 1h must have closed beyond its prior 20-bar high/low in that side. "any": no 1h filter.
+    # With both set to "any" the side is just the 15m break: long above the prior 20-bar high, short below the prior 20-bar low.
+    h4_gate = cfg.get("h4_gate", "trend")
+    h1_gate = cfg.get("h1_gate", "break")
     atr_tf = cfg.get("atr_tf", "15m")
     atr_bars = {"15m": bars_15m, "1h": bars_1h, "4h": bars_4h}[atr_tf]
     atr_15 = _atr(atr_bars, period)
@@ -33,34 +38,44 @@ def run_mtf(bars_1m, bars_15m, bars_1h, bars_4h, cfg, sides):
         if i < lookback_15:
             _skip(skips, "WARMUP")
             continue
-        trend = _trend(bars_4h, dec, lookback_4h)
-        if trend == "NONE":
-            _skip(skips, "NO_4H_TREND")
-            continue
-        if trend not in sides:
-            _skip(skips, "SIDE_FILTER")
-            continue
-        if not _broke(bars_1h, dec, lookback_1h, trend):
-            _skip(skips, "NO_1H_BREAK")
-            continue
-        window = bars_15m[i - lookback_15:i]
-        level = max(b.high for b in window) if trend == "LONG" else min(b.low for b in window)
-        broke = bar.close > level if trend == "LONG" else bar.close < level
-        if fill_mode != "touch" and not broke:
-            _skip(skips, "NO_15M_BREAK")
-            continue
-        if fill_mode == "next_open":
-            i_fill = bisect.bisect_left(times_1m, now)
-            if i_fill >= len(bars_1m):
+        trend4 = _trend(bars_4h, dec, lookback_4h)
+        if h4_gate == "trend":
+            if trend4 == "NONE":
+                _skip(skips, "NO_4H_TREND")
                 continue
-            hit = (i_fill, bars_1m[i_fill].open)
-        elif fill_mode == "touch":
-            hit = _stop_touch(bars_1m, bar.open_time, now, trend, level)
+            if trend4 not in sides:
+                _skip(skips, "SIDE_FILTER")
+                continue
+            options = [trend4]
         else:
-            hit = _touch(bars_1m, bar.open_time, now, trend, level)
-        if hit is None:
-            _skip(skips, "NO_LIMIT_TOUCH")
+            options = [x for x in ("LONG", "SHORT") if x in sides]
+        window = bars_15m[i - lookback_15:i]
+        found, saw_1h = [], False
+        for side in options:
+            if h1_gate == "break" and not _broke(bars_1h, dec, lookback_1h, side):
+                continue
+            saw_1h = True
+            level = max(b.high for b in window) if side == "LONG" else min(b.low for b in window)
+            if fill_mode != "touch" and not (bar.close > level if side == "LONG" else bar.close < level):
+                continue
+            if fill_mode == "next_open":
+                i_fill = bisect.bisect_left(times_1m, now)
+                hit = (i_fill, bars_1m[i_fill].open) if i_fill < len(bars_1m) else None
+            elif fill_mode == "touch":
+                hit = _stop_touch(bars_1m, bar.open_time, now, side, level)
+            else:
+                hit = _touch(bars_1m, bar.open_time, now, side, level)
+            if hit is None:
+                _skip(skips, "NO_LIMIT_TOUCH")
+                continue
+            found.append((hit[0], side, level, hit))
+        if not found:
+            if not saw_1h:
+                _skip(skips, "NO_1H_BREAK")
+            else:
+                _skip(skips, "NO_15M_BREAK")
             continue
+        _, trend, level, hit = min(found, key=lambda x: x[0])
         i_fill, raw = hit
         atr_v = _latest_atr(atr_bars, atr_15, dec)
         if not atr_v:
