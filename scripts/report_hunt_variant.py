@@ -93,6 +93,7 @@ def summarize(rows, risk):
         ("longest time under a peak", f"{worst_under / 86_400_000:.0f} days"),
         ("longest losing streak", f"{longest} trades"),
         ("profitable months", f"{sum(v > 0 for v in months.values())} of {len(months)}  (worst {min(months.values()):+.0f}R, best {max(months.values()):+.0f}R)"),
+        ("avg per trade if fee is", " / ".join(f"{(total + sum(x['fee_r'] for x in rows) * (1 - bp / 2)) / len(rs):+.3f}R at {bp:g}bp" for bp in (0, 1, 3, 4))),
         ("fees paid", f"{sum(x['fee_r'] for x in rows):.0f}R  ({sum(x['fee_r'] for x in rows) / len(rs):.3f}R per trade)"),
         ("exits: TP / floor / stop", f"{mix['TARGET']} / {mix['FLOOR']} / {mix['STOP']}" + (f" (+{mix['END']} open at the end)" if mix["END"] else "")),
     ]
