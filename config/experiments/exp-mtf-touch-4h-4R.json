@@ -1,0 +1,28 @@
+{
+  "experiment_id": "exp-mtf-touch-4h-4R",
+  "family": "MTF",
+  "description": "4h/1h/15m stack, resting stop at the level, every touch, stop 1.5 x 4h ATR, target 6.0 x 4h ATR",
+  "symbol": "BTC_USDT",
+  "sides": [
+    "LONG",
+    "SHORT"
+  ],
+  "lookback_4h": 20,
+  "lookback_1h": 20,
+  "lookback_15": 20,
+  "atr_period": 14,
+  "sl_atr": 1.5,
+  "tp_atr": 6.0,
+  "quiet_minutes": 15,
+  "fee_bps_per_side": 2.0,
+  "slippage_ticks": 1,
+  "slippage_bps": 0.5,
+  "tick_size": 0.1,
+  "same_bar_rule": "stop_first",
+  "funding_mode": "apply_if_table_present_else_flag_missing",
+  "start": null,
+  "end": null,
+  "one_position_at_a_time": true,
+  "fill_mode": "touch",
+  "atr_tf": "4h"
+}
