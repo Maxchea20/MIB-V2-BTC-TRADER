@@ -39,7 +39,11 @@ def stats(trades):
         y = datetime.fromtimestamp(t["entry_time"] / 1000, timezone.utc).year
         years[y] = years.get(y, 0.0) + t["r_multiple"]
     pos = sum(v > 0 for v in years.values())
-    return f"n={len(rs):4d} avg {sum(rs) / len(rs):+.3f}R total {sum(rs):+5.0f}R dip {dip:6.1f}R  years +{pos}/{len(years)}"
+    wins = sum(r for r in rs if r > 0)
+    losses = -sum(r for r in rs if r < 0)
+    pf = wins / losses if losses else float("inf")
+    win = sum(r > 0 for r in rs) / len(rs)
+    return f"n={len(rs):4d} avg {sum(rs) / len(rs):+.3f}R total {sum(rs):+5.0f}R win {win:.0%} PF(R) {pf:.2f} dip {dip:6.1f}R  years +{pos}/{len(years)}"
 
 
 def main():
