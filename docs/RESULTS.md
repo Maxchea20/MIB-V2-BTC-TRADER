@@ -475,6 +475,45 @@ Chop trades inside the 9 drops (61 trades, 1 win; the rest of each file wins 16-
 - The drops are windows picked because the account fell, so some of the lack of chop wins is selection. Chop and Hunt still fail together.
 - Idea to test next: a stop-rate rule (half size while 60% or more of the last 40 trades were stopped out). It is in `scripts/diagnose_hunt_drawdown.py` as "stop-rate" and "both".
 
+## Hunt V4 tweaks and Hunt + Floors risk rules (fixed box)
+
+Run with `scripts/test_v4_tweaks.py` (Hunt V4 variants, order rebuilt each time) and `scripts/diagnose_hunt_drawdown.py` (Hunt + Floors on the trade list). Total R / dip / R/dip:
+
+| Hunt V4 variant | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| Hunt V4 | +231 / -39.9 / 5.8 | +636 / -19.1 / 33.4 | +203 / -22.7 / 8.9 |
+| no chop | +234 / -27.7 / 8.5 | +511 / -20.1 / 25.5 | +174 / -19.0 / 9.2 |
+| **no 04-08h entries** | +203 / -26.2 / **7.8** | +653 / -17.5 / **37.2** | +187 / -18.6 / **10.0** |
+| no chop, no 04-08h | +212 / -23.4 / 9.1 | +530 / -18.3 / 29.0 | +159 / -15.9 / 10.0 |
+| chop min risk 0.3% | +218 / -30.8 / 7.1 | +550 / -19.6 / 28.1 | +217 / -21.5 / 10.1 |
+| chop min risk 0.5% | +172 / -30.8 / 5.6 | +523 / -18.6 / 28.1 | +204 / -21.5 / 9.5 |
+| chop max width 6% | +219 / -34.8 / 6.3 | +554 / -21.1 / 26.2 | +189 / -19.0 / 9.9 |
+| chop max width 7% | +257 / -35.9 / 7.2 | +635 / -20.9 / 30.4 | +212 / -19.0 / 11.2 |
+| chop half | +205 / -30.8 / 6.7 | +540 / -17.2 / 31.4 | +178 / -20.0 / 8.9 |
+
+Hunt + Floors on the trade list (total R / dip / R/dip). Inside-box and outside-box are now with the fixed box:
+
+| Rule | 2019-21 | 2022-25 | 2025-26 |
+|---|---|---|---|
+| none | +536 / -28.5 / 18.8 | +1156 / -41.4 / 27.9 | +325 / -28.9 / 11.3 |
+| outside the box only | +234 / -27.7 / 8.5 | +511 / -20.1 / 25.5 | +174 / -19.0 / 9.2 |
+| inside the box only | +302 / -20.3 / 14.9 | +645 / -44.8 / 14.4 | +151 / -25.2 / 6.0 |
+| day cap | +504 / -29.0 / 17.4 | +1004 / -30.5 / 32.9 | +306 / -20.8 / 14.8 |
+| pause | +522 / -29.7 / 17.6 | +1088 / -35.3 / 30.8 | +298 / -24.1 / 12.4 |
+| **throttle** | +474 / -22.2 / 21.3 | +1074 / -31.0 / 34.7 | +292 / -20.1 / 14.5 |
+| stop-rate | +533 / -21.6 / 24.7 | +1132 / -40.8 / 27.7 | +313 / -32.1 / 9.8 |
+| throttle + stop-rate | +474 / -22.2 / 21.3 | +1069 / -30.8 / 34.7 | +296 / -20.1 / 14.7 |
+| box half | +385 / -25.8 / 14.9 | +833 / -27.2 / 30.6 | +250 / -17.1 / 14.6 |
+| box half + throttle | +340 / -18.7 / 18.1 | +789 / -20.0 / 39.4 | +230 / -15.9 / 14.4 |
+
+Read:
+- With the box fixed, Hunt inside the box is not weaker than outside: avg R inside vs outside is +0.127 vs +0.093 (2019-21), +0.131 vs +0.133 (2022-25), +0.111 vs +0.135 (2025-26). The box has no consistent value for Hunt. Box half costs profit and is not better than throttle.
+- Throttle is confirmed again: R/dip up on all three files (21.3, 34.7, 14.5 vs 18.8, 27.9, 11.3).
+- Stop-rate helps only 2019-21 (24.7) and hurts 2025-26 (9.8 vs 11.3). Not robust. Day cap and pause are mixed.
+- No 04-08h entries on Hunt V4: dip and R/dip better on all three files (dip -26.2 / -17.5 / -18.6 vs -39.9 / -19.1 / -22.7; R/dip 7.8 / 37.2 / 10.0 vs 5.8 / 33.4 / 8.9), total R -12% / +3% / -8%. Found from the drop forensic and the earlier feature scan, so the hour is chosen with hindsight, but it shows up on all three files.
+- Chop min risk, chop half, chop max width and no chop are mixed: no variant is better on all three files. Box width is dropped as an idea.
+- Next: no 04-08h on Hunt + Floors + Throttle (added to `diagnose_hunt_drawdown.py`).
+
 ## Step 8 room-to-run veto test, 2022-25
 
 Optional swing veto from the user's doc: drop a swing to CHOP when price is within 0.25 ATR of the 7-bar 4h high (swing up) or low (swing down). `room` includes the newest bar in the 7; `room-ex` leaves it out; `-block` skips the vetoed trade instead of allowing both sides. Off by default. Run with `scripts/run_room_test.bat`.

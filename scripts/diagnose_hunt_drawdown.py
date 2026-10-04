@@ -10,6 +10,7 @@ Reads the newest `floors` Hunt trade file for the period (run scripts\\run_floor
     stop-rate   half size while 60% or more of the last 40 trades were stopped out (normal is about 45%)
     both        half size when either of the two above is on
   and on A only: box half (trades inside the box at half size) and box half + throttle
+  and on A and B: no 04-08h (skip entries from 04:00 to 08:00 UTC) and no 04-08h + throttle
 Usage: py scripts\\diagnose_hunt_drawdown.py research_2022_25
 """
 
@@ -155,6 +156,7 @@ def main():
     after3 = [losses[i] for i in range(3, len(losses)) if all(losses[i - 3:i])]
     print(f"  loss clustering: {sum(losses) / len(losses):.0%} of trades lose; after 3 losses in a row {sum(after3) / len(after3):.0%} lose (n={len(after3)})")
     half = [(t, r * (0.5 if box else 1.0)) for t, r, box, _ in rows]
+    asia = lambda t: 4 <= datetime.fromtimestamp(t / 1000, timezone.utc).hour < 8
     for label, rows_, rows_s in (("A", a, a_s), ("B", b, b_s)):
         print(f"  risk rules on {label}:")
         print("    none      " + _stats([r for _, r in rows_]))
@@ -163,6 +165,9 @@ def main():
         print("    throttle  " + _stats(_throttle(rows_)))
         print("    stop-rate " + _stats(_sizing(rows_s, use_equity=False)))
         print("    both      " + _stats(_sizing(rows_s)))
+        no_asia = [(t, r) for t, r in rows_ if not asia(t)]
+        print("    no 04-08h " + _stats([r for _, r in no_asia]))
+        print("    no 04-08h + throttle " + _stats(_throttle(no_asia)))
         if label == "A":
             print("    box half  " + _stats([r for _, r in half]))
             print("    box half + throttle " + _stats(_throttle(half)))
