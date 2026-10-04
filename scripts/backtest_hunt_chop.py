@@ -25,6 +25,7 @@ def main():
     if hours:
         start, end = (int(x) for x in hours.split("-"))
         hunt = [t for t in hunt if start <= datetime.fromtimestamp(int(t["entry_time"]) / 1000, timezone.utc).hour < end]
+    tag = next((a.split("=")[1] for a in sys.argv[3:] if a.startswith("tag=")), None)
     swing_only = "swing-only" in sys.argv[3:]
     if swing_only:
         hunt = [t for t in hunt if t["weather"] in ("SWING_UP", "SWING_DOWN")]
@@ -44,7 +45,7 @@ def main():
             tests[mode] = {"breakout_alone": _bucket(brk), "combined": _bucket(_one_position(kept, chop + brk))}
         print(json.dumps({"db": db.name, "hunt_file": str(hunt_file), "base": _bucket(merged), "breakout_tests": tests}, indent=2))
         return
-    folder = ROOT / "results" / ("exp-hunt-chop-swing" if swing_only else ("exp-hunt-chop-hours" if hours else "exp-hunt-chop-arbiter")) / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    folder = ROOT / "results" / (f"exp-hunt-chop-{tag}" if tag else ("exp-hunt-chop-swing" if swing_only else ("exp-hunt-chop-hours" if hours else "exp-hunt-chop-arbiter"))) / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     folder.mkdir(parents=True, exist_ok=True)
     with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, FIELDS, extrasaction="ignore")

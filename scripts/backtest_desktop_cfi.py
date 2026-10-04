@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from btc_research.config import research_db_path
 from btc_research.data.loader import load_bars
 from btc_research.data.resample import resample
+from btc_research.setups import hunt_exits
 
 FIVE = 300_000
 FIFTEEN = 900_000
@@ -23,16 +24,19 @@ def main():
     trail = "trail-1atr" in args
     room = "room-ex" if "room-ex" in args else ("room" if "room" in args else None)
     block = "room-block" in args
-    flags = ("trail-1atr", "room", "room-ex", "room-block")
+    exitmode = next((m for m in hunt_exits.MODES if m in args), None)
+    flags = ("trail-1atr", "room", "room-ex", "room-block") + tuple(hunt_exits.MODES)
     paths = [a for a in args if a not in flags] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
+        if exitmode:
+            name = f"exp-hunt-desktop-cfi-{exitmode}"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -43,11 +47,12 @@ def main():
         row["trail_1atr"] = trail
         row["room"] = room
         row["room_block"] = block
+        row["exitmode"] = exitmode
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None):
     trades = []
     open_trade = None
     quiet_until = 0
@@ -99,7 +104,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False)
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
             "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
             "arm": entry + atr if side == "LONG" else entry - atr,
-            "atr": atr, "trail": trail, "risk": 1.5 * atr, "entry_time": entry_time,
+            "atr": atr, "trail": trail, "risk": 1.5 * atr, "entry_time": entry_time, "exitmode": exitmode,
         }
         done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
         if done:
@@ -237,6 +242,8 @@ def _closed(bars, ts, span):
 
 
 def _walk(trade, bars, start, end):
+    if trade.get("exitmode"):
+        return hunt_exits.walk(trade, bars, start, end, trade["exitmode"])
     side = trade["side"]
     lo, hi = 0, len(bars)
     while lo < hi:
