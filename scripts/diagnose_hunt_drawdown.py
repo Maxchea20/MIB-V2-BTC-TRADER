@@ -116,7 +116,7 @@ def main():
     keys = sorted(active)
 
     def in_box(ts):
-        i = bisect.bisect_right(keys, ts)
+        i = bisect.bisect_right(keys, ts - 3_600_000)  # only a 1h bar that has closed by ts
         return bool(i and active[keys[i - 1]] is not None)
 
     rows = [(int(t["entry_time"]), float(t["r_multiple"]), in_box(int(t["entry_time"]))) for t in trades]

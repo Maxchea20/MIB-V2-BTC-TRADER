@@ -14,6 +14,7 @@ from btc_research.data.loader import load_bars
 from btc_research.data.resample import resample
 from btc_research.market_structure.failed_push_range import detect_push_range
 
+HOUR = 3_600_000
 FIELDS = ("book", "side", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl")
 
 
@@ -34,7 +35,9 @@ def main():
     print(f"{db.name} 1h={len(series)} hunt={hunt_file}")
     active = _flags(series)
     chop = _chop(series, active)
-    kept = [t for t in hunt if not _on(int(t["entry_time"]), active)]
+    keys = sorted(active)
+    lag = 0 if "box-leak" in sys.argv[3:] else HOUR
+    kept = [t for t in hunt if not _on(int(t["entry_time"]), active, keys, lag)]
     for trade in kept:
         trade["book"] = "HUNT"
     merged = _one_position(kept, chop)
@@ -215,12 +218,13 @@ def _one_position(hunt, chop):
     return out
 
 
-def _on(ts, active):
-    keys = sorted(active)
+def _on(ts, active, keys=None, lag=HOUR):
+    """Is the box on at ts? Only a 1h bar that has closed by ts counts (lag = 1h). lag=0 reads the bar still forming."""
+    keys = keys if keys is not None else sorted(active)
     lo, hi = 0, len(keys)
     while lo < hi:
         mid = (lo + hi) // 2
-        if keys[mid] <= ts:
+        if keys[mid] <= ts - lag:
             lo = mid + 1
         else:
             hi = mid
