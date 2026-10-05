@@ -33,3 +33,7 @@ Engine switches (default off): `trend-gate=1h|4h`, `atr-unit=1h`. A FIRE against
 ## Swing-only experiment (2026-10-05, pre-declared)
 `py scripts\swing_only_experiment.py <file>`: Hunt only while the weather says SWING_UP / SWING_DOWN (chop-weather FIREs are recorded as `FILTERED_CHOP_WEATHER`), no box, no chop book, realistic execution, floors on, with the 15m and the 1H ATR unit. CHoCH/BOS, side and gate splits are numbers only, nothing is tuned.
 Engine switch (default off): `swing-only`. Test: `tests/test_execution_engine.py::SwingOnly`.
+
+## Breakout-then-retest entry screen (2026-10-05, pre-declared, information test only)
+`py scripts\retest_entry_screen.py <file>`: a Hunt FIRE is the breakout; the entry is a market order after a closed 5m candle retests the level (low within 0.10 ATR of it, closes beyond it). Cancelled if a 5m candle closes 0.25 ATR back through the level (failed breakout), price runs 2 ATR beyond it without a retest (ran away), or 24 5m candles pass (expired). One watch at a time.
+Output: excess move after the fill (bp, over market drift) for IMMEDIATE breakout entry, RETEST entry, the same signals entered immediately, and the breakouts that never retested, at 15m/1h/4h/12h, for all weather and swing weather. No stops, targets or exits. Tests: `RetestWatch`.

@@ -174,6 +174,41 @@ class SwingOnly(unittest.TestCase):
         self.assertLess(len(trades), len(allw))
 
 
+class RetestWatch(unittest.TestCase):
+    """Breakout-then-retest rules, hand-built 5m candles. Long, level 100, ATR 1."""
+
+    def setUp(self):
+        import retest_entry_screen as R
+        self.R = R
+
+    def candles(self, rows):
+        out = []
+        for k, (h, l, c) in enumerate(rows):
+            out.append(Bar(k * 300_000, (k + 1) * 300_000, 101.0, h, l, c, 1.0))
+        return out, [b.open_time for b in out]
+
+    def watch(self, rows):
+        b5, t5 = self.candles(rows)
+        return self.R.watch_retest(b5, t5, 0, "LONG", 100.0, 1.0)
+
+    def test_a_dip_to_the_level_that_holds_is_a_retest(self):
+        out, bar = self.watch([(101.5, 101.0, 101.3), (101.4, 100.05, 100.4)])
+        self.assertEqual(out, "RETEST")
+        self.assertEqual(bar.close_time, 600_000)                 # entered after that candle CLOSED, never inside it
+
+    def test_closing_back_through_the_level_cancels_a_failed_breakout(self):
+        self.assertEqual(self.watch([(101.0, 99.5, 99.6), (101.0, 100.0, 100.5)])[0], "FAILED_BREAKOUT")
+
+    def test_running_away_without_a_retest_is_missed_not_chased(self):
+        self.assertEqual(self.watch([(102.6, 101.5, 102.4), (102.0, 100.0, 100.5)])[0], "RAN_AWAY")
+
+    def test_no_retest_in_two_hours_expires(self):
+        self.assertEqual(self.watch([(101.5, 101.0, 101.3)] * 30)[0], "EXPIRED")
+
+    def test_a_touch_that_closes_below_the_level_is_not_a_hold(self):
+        self.assertEqual(self.watch([(101.3, 99.95, 99.9), (101.3, 101.0, 101.2)] + [(101.5, 101.0, 101.3)] * 30)[0], "EXPIRED")
+
+
 class ChopExecution(unittest.TestCase):
     def setUp(self):
         self.cfg = ExecutionConfig()
