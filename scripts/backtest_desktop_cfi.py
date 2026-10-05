@@ -4,6 +4,7 @@ import bisect
 import csv
 import json
 import sys
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,11 +14,14 @@ sys.path.insert(0, str(ROOT / "src"))
 from btc_research.config import research_db_path
 from btc_research.data.loader import load_bars
 from btc_research.data.resample import resample
+from btc_research.execution import ExecutionConfig, market_fill
+from btc_research.execution.options import config_from_args
 from btc_research.setups import hunt_exits
 
 FIVE = 300_000
+NO_FLOORS = dict(tiers=())   # plain Hunt: stop 1.5 ATR, target 2.5 ATR, nothing else
 FIFTEEN = 900_000
-FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl", "level", "signal_time", "signal_price", "fill_reference", "fake_fill_removed")
+FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl", "level", "signal_time", "signal_side", "signal_level", "signal_price", "order_submit_time", "order_type", "intended_entry_price", "fill_status", "fill_time", "entry_raw", "entry_slippage", "execution_model", "latency_ms", "fill_reference", "fake_fill_removed", "exit_raw", "exit_slippage", "exit_order_type", "exit_liquidity", "fees", "gross_r_before_costs")
 
 
 def main():
@@ -27,13 +31,16 @@ def main():
     block = "room-block" in args
     exitmode = next((m for m in hunt_exits.MODES if m in args), None)
     fakefill = "fakefill" in args   # "realfill" is still accepted and does nothing: real fill is now the only default
-    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill") + tuple(hunt_exits.MODES)
-    paths = [a for a in args if a not in flags] or [None]
+    ideal_exits = "ideal-exits" in args
+    exec_cfg, _ = config_from_args(args)
+    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill", "ideal-exits") + tuple(hunt_exits.MODES)
+    paths = [a for a in args if a not in flags and "=" not in a] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill)
+        events = []
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill, exec_cfg, events, ideal_exits)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
@@ -53,11 +60,26 @@ def main():
         row["room_block"] = block
         row["exitmode"] = exitmode
         row["fakefill"] = fakefill
+        row["ideal_exits"] = ideal_exits
+        row["execution"] = None if fakefill else asdict(exec_cfg)
+        counts = {}
+        for e in events:
+            counts[e["status"]] = counts.get(e["status"], 0) + 1
+        row["fires"] = {"total": len(events), **counts}
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False, exec_cfg=None, events=None, ideal_exits=False):
+    """Hunt engine. SIGNAL (a FIRE) -> order -> fill or MISSED_FILL -> position -> exit. The strategy part (gate, weather, level, the 5m close answer)
+    is unchanged. Who gets filled, at what price and when is decided by btc_research.execution.
+    fakefill     the old invalid fill at the level with idealised exits (reproduces the pre-2026-10-04 numbers)
+    ideal_exits  real entry fill but the old idealised exits (to see what the exit model costs)
+    events       a list that receives one dict per FIRE (filled, skipped or missed), so nothing is silently dropped."""
+    exec_cfg = None if fakefill else (exec_cfg or ExecutionConfig())
+    walk_cfg = None if (fakefill or ideal_exits) else exec_cfg
+    if exec_cfg is not None and not exitmode:
+        exitmode = NO_FLOORS      # plain Hunt through the same walker, so exits are filled by the simulator
     trades = []
     times_1m = [b.open_time for b in bars]
     open_trade = None
@@ -66,6 +88,20 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
     atrs_4h = _atr(bars_4h)
     fast = _events(bars_15, 5)
     internal = _events(bars_15, 2)
+
+    def note(fire, status, reason=""):
+        if events is not None:
+            events.append(dict(fire, status=status, reason=reason))
+
+    def book(done):
+        nonlocal quiet_until, open_trade
+        quiet_until = done["exit_time"] + 15 * 60_000
+        open_trade = None
+        if done["exit_reason"] == "UNRESOLVED_BOTH_HIT":
+            note(done["_fire"], "UNRESOLVED_BOTH_HIT", "stop and target in the same 1m bar, policy=unresolved")
+        else:
+            trades.append(done)
+
     for j, bar in enumerate(bars_5):
         slot_start = (bar.open_time // FIFTEEN) * FIFTEEN
         if bar.open_time not in (slot_start, slot_start + FIVE, slot_start + 2 * FIVE):
@@ -90,66 +126,57 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         level = bars_15[j15 - 1].high if side == "LONG" else bars_15[j15 - 1].low
         if not _answers(side, level, live, slot, atrs[j15 - 1]):
             continue
-        entry_time = bar.open_time + FIVE
-        if open_trade and entry_time >= open_trade["entry_time"]:
-            done = _walk(open_trade, bars, open_trade["entry_time"], entry_time)
+        # ---- SIGNAL: the 5m candle has closed. This is the earliest moment Hunt can know the condition is true.
+        signal_bar = live[-1]
+        signal_time = signal_bar.close_time
+        fire = {"signal_time": signal_time, "signal_side": side, "signal_level": level, "signal_price": signal_bar.close, "event": event, "gate": gate, "weather": flag}
+        if open_trade and signal_time >= open_trade["entry_time"]:
+            done = _walk(open_trade, bars, open_trade["entry_time"], signal_time, walk_cfg)
             if done:
-                trades.append(done)
-                quiet_until = done["exit_time"] + 15 * 60_000
-                open_trade = None
+                book(done)
             else:
+                note(fire, "SKIPPED_POSITION_OPEN")
                 continue
-        if entry_time < quiet_until:
+        if signal_time < quiet_until:
+            note(fire, "SKIPPED_PAUSE")
             continue
         atr = atrs[j15 - 1]
-        signal_bar = bar
+        # ---- ORDER -> EXECUTION
         if fakefill:
             # OLD FAKE FILL, kept only to reproduce the invalid pre-2026-10-04 numbers: the level is a trigger price, not a price you could get.
             slip = 0.1 + level * 0.00005
-            execution = {"entry_time": entry_time, "entry": level + slip if side == "LONG" else level - slip,
-                         "signal_time": signal_bar.close_time, "signal_price": signal_bar.close, "fill_reference": "LEVEL_FAKE"}
+            execution = {"status": "FILLED", "fill_time": signal_time, "fill_price": level + slip if side == "LONG" else level - slip, "raw": level,
+                         "slippage": slip, "submit_time": signal_time, "model": "LEVEL_FAKE"}
         else:
-            execution = _real_entry_after_signal(bars, times_1m, signal_bar.close_time, side)
-            if execution is None:
+            fill = market_fill(bars, times_1m, side, signal_time + exec_cfg.latency_ms, exec_cfg, entering=True, intended=signal_bar.close)
+            if fill.status != "FILLED":
+                note(fire, "MISSED_FILL", fill.reason)
                 continue
-            execution["signal_price"] = signal_bar.close
-        entry_time = execution["entry_time"]
-        entry = execution["entry"]
+            execution = {"status": "FILLED", "fill_time": fill.fill_time, "fill_price": fill.fill_price, "raw": fill.raw_price, "slippage": fill.slippage,
+                         "submit_time": fill.submit_time, "model": fill.execution_model}
+        entry = execution["fill_price"]
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
-            "level": level, "signal_time": execution["signal_time"], "signal_price": execution["signal_price"],
-            "fill_reference": execution["fill_reference"], "fake_fill_removed": not fakefill,
+            "signal_time": signal_time, "signal_side": side, "signal_level": level, "level": level, "signal_price": signal_bar.close,
+            "order_submit_time": execution["submit_time"], "order_type": "MARKET", "intended_entry_price": signal_bar.close,
+            "fill_status": "FILLED", "fill_time": execution["fill_time"], "entry_raw": execution["raw"], "entry_slippage": execution["slippage"],
+            "execution_model": execution["model"], "latency_ms": execution["fill_time"] - signal_time,
+            "fill_reference": execution["model"], "fake_fill_removed": not fakefill,
             "entry": entry,
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
             "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
             "arm": entry + atr if side == "LONG" else entry - atr,
-            "atr": atr, "trail": trail, "risk": 1.5 * atr, "entry_time": entry_time, "exitmode": exitmode,
+            "atr": atr, "trail": trail, "risk": 1.5 * atr, "entry_time": execution["fill_time"], "exitmode": exitmode, "_fire": fire,
         }
-        done = _walk(open_trade, bars, entry_time, entry_time + FIVE)
+        note(fire, "ORDER_FILLED")
+        done = _walk(open_trade, bars, open_trade["entry_time"], signal_time + FIVE, walk_cfg)
         if done:
-            trades.append(done)
-            quiet_until = done["exit_time"] + 15 * 60_000
-            open_trade = None
+            book(done)
     if open_trade:
-        done = _walk(open_trade, bars, open_trade["entry_time"], bars[-1].open_time + 60_000)
+        done = _walk(open_trade, bars, open_trade["entry_time"], bars[-1].open_time + 60_000, walk_cfg)
         if done:
-            trades.append(done)
+            book(done)
     return [t for t in trades if t["exit_reason"] != "END_OF_DATA"]
-
-
-def _real_entry_after_signal(bars_1m, times_1m, signal_time, side):
-    """Convert a CLOSED 5m signal into a causal entry: the first 1m candle whose open is at or after the signal candle's close_time
-    (close_time is the exclusive end, so it equals the open of the next 1m candle). The level is only the trigger, never the fill.
-    Slippage always worsens the price."""
-    i = bisect.bisect_left(times_1m, signal_time)
-    if i >= len(bars_1m):
-        return None
-    bar = bars_1m[i]
-    if bar.open_time < signal_time:
-        raise RuntimeError("LOOK-AHEAD ERROR: entry candle opens before the signal candle closed")
-    slip = 0.1 + bar.open * 0.00005
-    fill = bar.open + slip if side == "LONG" else bar.open - slip
-    return {"entry_time": bar.open_time, "entry": fill, "signal_time": signal_time, "signal_price": bar.open, "fill_reference": "NEXT_1M_OPEN"}
 
 
 def _events(bars, lr):
@@ -275,9 +302,9 @@ def _closed(bars, ts, span):
     return lo
 
 
-def _walk(trade, bars, start, end):
+def _walk(trade, bars, start, end, exec_cfg=None):
     if trade.get("exitmode"):
-        return hunt_exits.walk(trade, bars, start, end, trade["exitmode"])
+        return hunt_exits.walk(trade, bars, start, end, trade["exitmode"], exec_cfg)
     side = trade["side"]
     lo, hi = 0, len(bars)
     while lo < hi:

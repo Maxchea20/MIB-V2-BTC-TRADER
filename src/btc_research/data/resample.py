@@ -14,7 +14,9 @@ def resample(bars, timeframe: str):
     out = []
     bucket = None
     current = None
+    last_close = None
     for bar in bars:
+        last_close = bar.close_time
         key = bar.open_time // step
         if bucket is None or key != bucket:
             if current is not None and current.close_time - current.open_time == step:
@@ -27,6 +29,7 @@ def resample(bars, timeframe: str):
             current.low = min(current.low, bar.low)
             current.close = bar.close
             current.volume += bar.volume
-    if current is not None and current.close_time - current.open_time == step:
+    # The last bucket is only a closed candle if the data reaches its end. A partial final candle is still forming and must never become a signal candle.
+    if current is not None and current.close_time - current.open_time == step and last_close >= current.close_time:
         out.append(current)
     return out

@@ -1,5 +1,6 @@
 """Hunt off while the failed-push box is on. Chop owns that box. One position."""
 
+import bisect
 import csv
 import json
 import sys
@@ -12,11 +13,17 @@ sys.path.insert(0, str(ROOT / "src"))
 from btc_research.config import research_db_path
 from btc_research.data.loader import load_bars
 from btc_research.data.resample import resample
+from btc_research.execution import market_fill, resolve_bar
+from btc_research.execution.options import config_from_args
 from btc_research.market_structure.failed_push_range import detect_push_range
+from btc_research.setups import hunt_exits
 
 HOUR = 3_600_000
+EXEC = None      # ExecutionConfig: chop entries and exits are filled by the execution simulator on 1m bars. None = the legacy fills.
+BARS_1M = []
+TIMES_1M = []
 REAL_STOP = False  # True: a stop is booked at the close of the bar that closed through the line (minus slippage), not at the line
-FIELDS = ("book", "side", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl")
+FIELDS = ("book", "side", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl", "signal_time", "signal_side", "signal_level", "signal_price", "order_submit_time", "order_type", "intended_entry_price", "fill_status", "fill_time", "entry_raw", "entry_slippage", "execution_model", "latency_ms", "fake_fill_removed", "exit_raw", "exit_slippage", "exit_order_type", "exit_liquidity", "fees", "gross_r_before_costs")
 
 
 def main():
@@ -32,6 +39,10 @@ def main():
     if swing_only:
         hunt = [t for t in hunt if t["weather"] in ("SWING_UP", "SWING_DOWN")]
     bars, info = load_bars(db, "BTC_USDT", None, None)
+    global EXEC, BARS_1M, TIMES_1M
+    cfg, _ = config_from_args(sys.argv[3:])
+    if "exec-off" not in sys.argv[3:]:
+        EXEC, BARS_1M, TIMES_1M = cfg, bars, [b.open_time for b in bars]
     series = resample(bars, "1h")
     print(f"{db.name} 1h={len(series)} hunt={hunt_file}")
     active = _flags(series)
@@ -166,6 +177,16 @@ def _chop(series, active):
         nxt = series[i + 1]
         slip = 0.1 + nxt.open * 0.00005
         entry = nxt.open + slip if side == "LONG" else nxt.open - slip
+        audit = {}
+        if EXEC is not None:
+            fill = market_fill(BARS_1M, TIMES_1M, side, bar.close_time + EXEC.latency_ms, EXEC, entering=True, intended=bar.close)
+            if fill.status != "FILLED":
+                continue
+            entry = fill.fill_price
+            audit = {"signal_time": bar.close_time, "signal_side": side, "signal_level": state.low if side == "LONG" else state.high, "signal_price": bar.close,
+                     "order_submit_time": fill.submit_time, "order_type": "MARKET", "intended_entry_price": bar.close, "fill_status": "FILLED",
+                     "fill_time": fill.fill_time, "entry_raw": fill.raw_price, "entry_slippage": fill.slippage, "execution_model": fill.execution_model,
+                     "latency_ms": fill.fill_time - bar.close_time, "fake_fill_removed": True}
         stop = state.low if side == "LONG" else state.high
         target = state.high if side == "LONG" else state.low
         risk = abs(entry - stop)
@@ -173,7 +194,7 @@ def _chop(series, active):
             continue
         if side == "SHORT" and (stop <= entry or target >= entry):
             continue
-        trade = {"book": "CHOP", "side": side, "entry": entry, "stop": stop, "target": target, "risk": risk, "entry_time": nxt.open_time, "line_high": state.high, "line_low": state.low}
+        trade = {"book": "CHOP", "side": side, "entry": entry, "stop": stop, "target": target, "risk": risk, "entry_time": audit.get("fill_time", nxt.open_time), "line_high": state.high, "line_low": state.low, **audit}
         done = _walk(trade, series, i + 1)
         if not done:
             continue
@@ -190,7 +211,31 @@ def _reject(bar, high, low, width):
     return None
 
 
+def _walk_exec(trade, series, start):
+    """Chop exits through the execution simulator. Strategy rules are unchanged: the target is the other line (a resting limit), the stop is a
+    1h CLOSE through the entry line (known only when that hour closes, so a market exit is submitted then). Everything is filled on 1m bars."""
+    cfg = EXEC
+    side = trade["side"]
+    active = trade["entry_time"] + cfg.latency_ms
+    for k in range(start, len(series)):
+        hour = series[k]
+        a = bisect.bisect_left(TIMES_1M, max(hour.open_time, active))
+        b = bisect.bisect_left(TIMES_1M, hour.close_time)
+        for m in range(a, b):
+            ev = resolve_bar(BARS_1M[m], side, None, trade["target"], cfg)
+            if ev is not None:
+                return hunt_exits._close_exec(trade, "TARGET", ev["raw"], ev["fill"], ev["time"], ev["order_type"], ev["liquidity"], cfg)
+        if hour.close < trade["line_low"] if side == "LONG" else hour.close > trade["line_high"]:
+            fill = market_fill(BARS_1M, TIMES_1M, side, hour.close_time + cfg.latency_ms, cfg, entering=False)
+            if fill.status != "FILLED":
+                return None
+            return hunt_exits._close_exec(trade, "STOP", fill.raw_price, fill.fill_price, fill.fill_time, "MARKET", "taker", cfg)
+    return None
+
+
 def _walk(trade, series, start):
+    if EXEC is not None:
+        return _walk_exec(trade, series, start)
     for bar in series[start:]:
         broke = bar.close < trade["line_low"] if trade["side"] == "LONG" else bar.close > trade["line_high"]
         target_hit = bar.high >= trade["target"] if trade["side"] == "LONG" else bar.low <= trade["target"]

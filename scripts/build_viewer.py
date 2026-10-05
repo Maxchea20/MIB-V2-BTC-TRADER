@@ -37,7 +37,7 @@ def _hunt_row(t, book="HUNT"):
 
 def _chop_row(t):
     return {
-        "a": int(t["entry_time"]) // 1000, "b": int(t["exit_time"]) // 1000 + 3600, "s": 1 if t["side"] == "LONG" else -1,
+        "a": int(t["entry_time"]) // 1000, "b": int(t["exit_time"]) // 1000 + (0 if t.get("execution_model") else 3600), "s": 1 if t["side"] == "LONG" else -1,
         "e": round(float(t["entry"]), 2), "sl": round(float(t["stop"]), 2), "tp": round(float(t["target"]), 2), "x": round(float(t["exit"]), 2),
         "r": round(float(t["r_multiple"]), 3), "why": t["exit_reason"], "bk": "CHOP", "w": "", "g": "box line",
     }
@@ -71,6 +71,11 @@ def load_trades(name, source, series_1h):
     if source == "floors":
         return [_hunt_row(t) for t in hunt]
     import backtest_hunt_chop as hc
+    from btc_research.execution import ExecutionConfig
+    from btc_research.config import research_db_path
+    from btc_research.data.loader import load_bars
+    bars_1m, _ = load_bars(research_db_path(f"backend/{name}.db"), "BTC_USDT", None, None)
+    hc.EXEC, hc.BARS_1M, hc.TIMES_1M = ExecutionConfig(), bars_1m, [b.open_time for b in bars_1m]   # chop entries and exits through the execution simulator
     active = hc._flags(series_1h)
     keys = sorted(active)
     kept = [t for t in hunt if not hc._on(int(t["entry_time"]), active, keys, hc.HOUR)]
