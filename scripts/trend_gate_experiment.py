@@ -1,10 +1,10 @@
-"""One pre-declared experiment: Hunt only in the direction of the 1H trend, realistic execution (market order after the closed 5m signal + latency, simulated exits).
+"""One pre-declared experiment: Hunt only in the direction of the 1H trend (gate=4h: the 4H trend), realistic execution (market order after the closed 5m signal + latency, simulated exits).
 1H trend = the last closed 1H close vs the close 20 1H bars earlier. Hunt's own conditions are unchanged; a FIRE against the trend is FILTERED_TREND_GATE.
 Four runs (floors on, same strategy otherwise):
   A0  Hunt, ATR unit 15m (as designed)          A1  the same, 1H-trend gate
   B0  Hunt, ATR unit 1H (stop about 1% of price) B1  the same, 1H-trend gate
 Each prints trades/day, hold, win rate, avg R, PF(R), total R, dip, years positive, and the direction information after the fill (excess move over market drift, bp; cost about 5 bp).
-Usage: py scripts\\trend_gate_experiment.py research_binance [latency=1] [intrabar=conservative]
+Usage: py scripts\\trend_gate_experiment.py research_binance [gate=1h|4h] [latency=1] [intrabar=conservative]
 """
 
 import bisect
@@ -48,18 +48,21 @@ def summary(label, trades, days):
 
 def main():
     cfg, rest = config_from_args(sys.argv[1:])
+    tf = next((a.split("=", 1)[1] for a in rest if a.startswith("gate=")), "1h")
+    rest = [a for a in rest if not a.startswith("gate=")]
     name = rest[0] if rest else "research_binance"
+    T = tf.upper()
     bars, _ = load_bars(research_db_path(f"backend/{name}.db"), "BTC_USDT", None, None)
     times = [b.open_time for b in bars]
     r = [resample(bars, x) for x in ("5m", "15m", "1h", "4h")]
     days = (bars[-1].open_time - bars[0].open_time) / DAY_MS
-    print(f"{name}: {days:.0f} days. Realistic execution: latency {cfg.execution_latency_seconds}s, same-bar stop+target {cfg.intrabar_policy}. 1H trend = close vs close 20 hours earlier.")
+    print(f"{name}: {days:.0f} days. Realistic execution: latency {cfg.execution_latency_seconds}s, same-bar stop+target {cfg.intrabar_policy}. {T} trend = last closed {T} close vs the close 20 {T} bars earlier.")
     out = {}
-    for key, gate, unit in (("A0", None, "15m"), ("A1", ("1h", 20), "15m"), ("B0", None, "1h"), ("B1", ("1h", 20), "1h")):
+    for key, gate, unit in (("A0", None, "15m"), ("A1", (tf, 20), "15m"), ("B0", None, "1h"), ("B1", (tf, 20), "1h")):
         events = []
         out[key] = (eng._run(bars, *r, False, None, False, "floors", False, cfg, events, False, gate, unit), events)
         print(f"  ... {key} done", flush=True)
-    labels = {"A0": "A0 ungated, 15m ATR unit", "A1": "A1 1H-trend gate, 15m ATR unit", "B0": "B0 ungated, 1H ATR unit", "B1": "B1 1H-trend gate, 1H ATR unit"}
+    labels = {"A0": "A0 ungated, 15m ATR unit", "A1": f"A1 {T}-trend gate, 15m ATR unit", "B0": "B0 ungated, 1H ATR unit", "B1": f"B1 {T}-trend gate, 1H ATR unit"}
     print()
     for key in ("A0", "A1", "B0", "B1"):
         trades, events = out[key]

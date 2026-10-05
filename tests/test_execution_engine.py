@@ -141,6 +141,15 @@ class TrendGate(unittest.TestCase):
         self.assertGreater(len(filtered), 0)                              # filtered FIREs are recorded, not dropped
         self.assertGreater(len(events), len(filtered))
 
+    def test_4h_gate_follows_the_closed_4h_trend(self):
+        trades, events = self.go(trend_gate=("4h", 20))
+        h4 = self.r[3]
+        self.assertGreater(len(trades), 5)
+        for t in trades:
+            n = eng._closed(h4, t["signal_time"], 14_400_000)
+            self.assertEqual(t["side"], "LONG" if h4[n - 1].close > h4[n - 21].close else "SHORT")
+        self.assertTrue(any(e["status"] == "FILTERED_TREND_GATE" for e in events))
+
     def test_1h_atr_unit_sizes_stop_and_target_from_the_1h_atr(self):
         trades, _ = self.go(atr_unit="1h")
         atr_1h = eng._atr(self.r[2])
