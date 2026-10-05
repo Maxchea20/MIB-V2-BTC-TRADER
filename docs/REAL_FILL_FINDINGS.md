@@ -23,3 +23,10 @@ Still to run: `py scripts\mtf_robust.py <db>` on all three files (grid 1.5 to 3.
 ## Tools
 `scripts/run_mtf_fill_tests.py`, `scripts/mtf_robust.py`, `scripts/forensic_mtf_fill.py`, `scripts/forensic_fill_early.py`, `scripts/fill_gap_check.py`, `scripts/chop_real_stop.py`, `scripts/build_viewer.py` (trade viewer).
 Engine flag: `backtest_desktop_cfi.py ... realfill`. MTF options: `fill_mode` (legacy / next_open / touch), `atr_tf`, `h4_gate`, `h1_gate`, `entry_delay_minutes`.
+
+## Engine default (2026-10-05)
+`scripts/backtest_desktop_cfi.py` now fills at the next 1m open after the CLOSED 5m signal candle, plus slippage, by default (`_real_entry_after_signal`). The level is only the trigger, never the fill.
+The old fill is only available with the `fakefill` flag (to reproduce the invalid numbers; trades are tagged `fill_reference=LEVEL_FAKE`, `fake_fill_removed=False`, results go to a `-fakefill` folder). The `realfill` flag is still accepted and does nothing.
+Every trade row now carries `level`, `signal_time`, `signal_price`, `fill_reference`, `fake_fill_removed`, and the engine raises if an entry opens before its signal closed.
+`close_time` in this repo is the exclusive end of a bar (= the open of the next 1m candle), so the first executable candle is `open_time >= signal close_time`. A strict `>` would enter one minute late.
+Checked on random data: the new default reproduces the old `realfill` trades exactly (2,355 of 2,355), and `fakefill` reproduces the old fake trades exactly (2,380 of 2,380).

@@ -1,5 +1,6 @@
 """Desktop Hunt C-FI. trail-1atr follows 1 ATR behind the best price after 1 ATR in favor."""
 
+import bisect
 import csv
 import json
 import sys
@@ -16,7 +17,7 @@ from btc_research.setups import hunt_exits
 
 FIVE = 300_000
 FIFTEEN = 900_000
-FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl")
+FIELDS = ("side", "event", "gate", "weather", "entry", "stop", "target", "exit", "entry_time", "exit_time", "exit_reason", "r_multiple", "net_pnl", "level", "signal_time", "signal_price", "fill_reference", "fake_fill_removed")
 
 
 def main():
@@ -25,21 +26,21 @@ def main():
     room = "room-ex" if "room-ex" in args else ("room" if "room" in args else None)
     block = "room-block" in args
     exitmode = next((m for m in hunt_exits.MODES if m in args), None)
-    realfill = "realfill" in args
-    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill") + tuple(hunt_exits.MODES)
+    fakefill = "fakefill" in args   # "realfill" is still accepted and does nothing: real fill is now the only default
+    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill") + tuple(hunt_exits.MODES)
     paths = [a for a in args if a not in flags] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, realfill)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
         if exitmode:
             name = f"exp-hunt-desktop-cfi-{exitmode}"
-        if realfill:
-            name += "-realfill"
+        if fakefill:
+            name += "-fakefill"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -51,14 +52,14 @@ def main():
         row["room"] = room
         row["room_block"] = block
         row["exitmode"] = exitmode
-        row["realfill"] = realfill
+        row["fakefill"] = fakefill
         row["file"] = str(folder / "trades.csv")
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, realfill=False):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False):
     trades = []
-    by_open = {b.open_time: b for b in bars} if realfill else None
+    times_1m = [b.open_time for b in bars]
     open_trade = None
     quiet_until = 0
     atrs = _atr(bars_15)
@@ -101,17 +102,23 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         if entry_time < quiet_until:
             continue
         atr = atrs[j15 - 1]
-        slip = 0.1 + level * 0.00005
-        entry = level + slip if side == "LONG" else level - slip
-        if realfill:
-            # the signal is only known when the 5m candle closes: the first price you can get is the next 1m open
-            nxt = by_open.get(entry_time)
-            if nxt is None:
+        signal_bar = bar
+        if fakefill:
+            # OLD FAKE FILL, kept only to reproduce the invalid pre-2026-10-04 numbers: the level is a trigger price, not a price you could get.
+            slip = 0.1 + level * 0.00005
+            execution = {"entry_time": entry_time, "entry": level + slip if side == "LONG" else level - slip,
+                         "signal_time": signal_bar.close_time, "signal_price": signal_bar.close, "fill_reference": "LEVEL_FAKE"}
+        else:
+            execution = _real_entry_after_signal(bars, times_1m, signal_bar.close_time, side)
+            if execution is None:
                 continue
-            slip = 0.1 + nxt.open * 0.00005
-            entry = nxt.open + slip if side == "LONG" else nxt.open - slip
+            execution["signal_price"] = signal_bar.close
+        entry_time = execution["entry_time"]
+        entry = execution["entry"]
         open_trade = {
             "side": side, "event": event, "gate": gate, "weather": flag,
+            "level": level, "signal_time": execution["signal_time"], "signal_price": execution["signal_price"],
+            "fill_reference": execution["fill_reference"], "fake_fill_removed": not fakefill,
             "entry": entry,
             "stop": entry - 1.5 * atr if side == "LONG" else entry + 1.5 * atr,
             "target": entry + 2.5 * atr if side == "LONG" else entry - 2.5 * atr,
@@ -128,6 +135,21 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         if done:
             trades.append(done)
     return [t for t in trades if t["exit_reason"] != "END_OF_DATA"]
+
+
+def _real_entry_after_signal(bars_1m, times_1m, signal_time, side):
+    """Convert a CLOSED 5m signal into a causal entry: the first 1m candle whose open is at or after the signal candle's close_time
+    (close_time is the exclusive end, so it equals the open of the next 1m candle). The level is only the trigger, never the fill.
+    Slippage always worsens the price."""
+    i = bisect.bisect_left(times_1m, signal_time)
+    if i >= len(bars_1m):
+        return None
+    bar = bars_1m[i]
+    if bar.open_time < signal_time:
+        raise RuntimeError("LOOK-AHEAD ERROR: entry candle opens before the signal candle closed")
+    slip = 0.1 + bar.open * 0.00005
+    fill = bar.open + slip if side == "LONG" else bar.open - slip
+    return {"entry_time": bar.open_time, "entry": fill, "signal_time": signal_time, "signal_price": bar.open, "fill_reference": "NEXT_1M_OPEN"}
 
 
 def _events(bars, lr):
