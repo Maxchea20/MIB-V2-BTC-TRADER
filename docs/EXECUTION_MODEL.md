@@ -25,3 +25,7 @@ The real MEXC order/fill logs are not in this repository, so none of these could
 Options: `latency=0` (best case on 1m data), `latency=1`, `entry-slip=`, `exit-slip=`, `intrabar=conservative|optimistic|unresolved`.
 Engine: `py scripts\backtest_desktop_cfi.py backend\research_binance.db floors` is now the realistic model; `fakefill` reproduces the old invalid numbers, `ideal-exits` keeps real entries with the old exits.
 Tests: `python -m unittest discover tests` (45 tests).
+
+## Trend-gate experiment (2026-10-05, pre-declared)
+`py scripts\trend_gate_experiment.py <file>` runs Hunt with floors under the realistic model four ways: ungated / gated by the 1H trend (last closed 1H close vs the close 20 hours earlier), each with the 15m ATR unit (Hunt as designed) and the 1H ATR unit (stop about 1% of price).
+Engine switches (default off): `trend-gate=1h|4h`, `atr-unit=1h`. A FIRE against the trend is recorded as `FILTERED_TREND_GATE`. Tests: `tests/test_execution_engine.py::TrendGate`.

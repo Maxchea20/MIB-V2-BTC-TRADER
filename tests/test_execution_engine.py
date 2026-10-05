@@ -109,6 +109,49 @@ class HuntExecution(unittest.TestCase):
         self.assertTrue(all(t["fill_time"] == t["signal_time"] for t in t0))
 
 
+class TrendGate(unittest.TestCase):
+    """The optional 1H-trend gate and the 1H ATR unit. Both are off by default and must not change Hunt when off."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.bars = synthetic(40, 17)
+        cls.cfg = ExecutionConfig()
+        cls.r = [resample(cls.bars, x) for x in ("5m", "15m", "1h", "4h")]
+
+    def go(self, **kw):
+        events = []
+        trades = eng._run(self.bars, *self.r, False, None, False, "floors", False, self.cfg, events, False, **kw)
+        return trades, events
+
+    def test_off_by_default_changes_nothing(self):
+        a, _ = self.go()
+        b, _ = self.go(trend_gate=None, atr_unit="15m")
+        key = lambda ts: [(t["signal_time"], t["entry"], t["exit"], t["r_multiple"]) for t in ts]
+        self.assertEqual(key(a), key(b))
+
+    def test_gated_trades_only_follow_the_closed_1h_trend(self):
+        trades, events = self.go(trend_gate=("1h", 20))
+        h1 = self.r[2]
+        self.assertGreater(len(trades), 10)
+        for t in trades:
+            n = eng._closed(h1, t["signal_time"], 3_600_000)           # only 1H bars that had closed when the signal became known
+            trend = "LONG" if h1[n - 1].close > h1[n - 21].close else "SHORT"
+            self.assertEqual(t["side"], trend)
+        filtered = [e for e in events if e["status"] == "FILTERED_TREND_GATE"]
+        self.assertGreater(len(filtered), 0)                              # filtered FIREs are recorded, not dropped
+        self.assertGreater(len(events), len(filtered))
+
+    def test_1h_atr_unit_sizes_stop_and_target_from_the_1h_atr(self):
+        trades, _ = self.go(atr_unit="1h")
+        atr_1h = eng._atr(self.r[2])
+        for t in trades[:50]:
+            n = eng._closed(self.r[2], t["signal_time"], 3_600_000)
+            self.assertAlmostEqual(t["atr"], atr_1h[n - 1])
+            self.assertAlmostEqual(t["risk"], 1.5 * atr_1h[n - 1])
+            sign = 1 if t["side"] == "LONG" else -1
+            self.assertAlmostEqual((t["target"] - t["entry"]) * sign, 2.5 * atr_1h[n - 1])
+
+
 class ChopExecution(unittest.TestCase):
     def setUp(self):
         self.cfg = ExecutionConfig()

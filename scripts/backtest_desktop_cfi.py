@@ -33,6 +33,9 @@ def main():
     fakefill = "fakefill" in args   # "realfill" is still accepted and does nothing: real fill is now the only default
     ideal_exits = "ideal-exits" in args
     exec_cfg, _ = config_from_args(args)
+    gate_arg = next((a.split("=", 1)[1] for a in args if a.startswith("trend-gate=")), None)
+    trend_gate = (gate_arg, 20) if gate_arg else None
+    atr_unit = next((a.split("=", 1)[1] for a in args if a.startswith("atr-unit=")), "15m")
     flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill", "ideal-exits") + tuple(hunt_exits.MODES)
     paths = [a for a in args if a not in flags and "=" not in a] or [None]
     for raw in paths:
@@ -40,7 +43,7 @@ def main():
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
         events = []
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill, exec_cfg, events, ideal_exits)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill, exec_cfg, events, ideal_exits, trend_gate, atr_unit)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
@@ -48,6 +51,10 @@ def main():
             name = f"exp-hunt-desktop-cfi-{exitmode}"
         if fakefill:
             name += "-fakefill"
+        if trend_gate:
+            name += f"-gate{trend_gate[0]}"
+        if atr_unit != "15m":
+            name += f"-unit{atr_unit}"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -61,6 +68,8 @@ def main():
         row["exitmode"] = exitmode
         row["fakefill"] = fakefill
         row["ideal_exits"] = ideal_exits
+        row["trend_gate"] = trend_gate
+        row["atr_unit"] = atr_unit
         row["execution"] = None if fakefill else asdict(exec_cfg)
         counts = {}
         for e in events:
@@ -70,12 +79,15 @@ def main():
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False, exec_cfg=None, events=None, ideal_exits=False):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False, exec_cfg=None, events=None, ideal_exits=False, trend_gate=None, atr_unit="15m"):
     """Hunt engine. SIGNAL (a FIRE) -> order -> fill or MISSED_FILL -> position -> exit. The strategy part (gate, weather, level, the 5m close answer)
     is unchanged. Who gets filled, at what price and when is decided by btc_research.execution.
     fakefill     the old invalid fill at the level with idealised exits (reproduces the pre-2026-10-04 numbers)
     ideal_exits  real entry fill but the old idealised exits (to see what the exit model costs)
-    events       a list that receives one dict per FIRE (filled, skipped or missed), so nothing is silently dropped."""
+    events       a list that receives one dict per FIRE (filled, skipped or missed), so nothing is silently dropped.
+    trend_gate   optional ("1h"|"4h", lookback): only take FIREs in the direction of that trend (last closed close vs the close `lookback` bars earlier).
+                 A FIRE against the trend is recorded as FILTERED_TREND_GATE. Default None = Hunt unchanged.
+    atr_unit     "15m" (Hunt as designed) or "1h": the ATR that sizes stop 1.5 / target 2.5 / floors. Default unchanged."""
     exec_cfg = None if fakefill else (exec_cfg or ExecutionConfig())
     walk_cfg = None if (fakefill or ideal_exits) else exec_cfg
     if exec_cfg is not None and not exitmode:
@@ -86,6 +98,8 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
     quiet_until = 0
     atrs = _atr(bars_15)
     atrs_4h = _atr(bars_4h)
+    atrs_1h = _atr(bars_1h) if atr_unit == "1h" else None
+    gate_bars, gate_span = ((bars_1h, 3_600_000) if trend_gate and trend_gate[0] == "1h" else (bars_4h, 14_400_000)) if trend_gate else (None, None)
     fast = _events(bars_15, 5)
     internal = _events(bars_15, 2)
 
@@ -130,6 +144,17 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         signal_bar = live[-1]
         signal_time = signal_bar.close_time
         fire = {"signal_time": signal_time, "signal_side": side, "signal_level": level, "signal_price": signal_bar.close, "event": event, "gate": gate, "weather": flag}
+        if trend_gate:
+            n = _closed(gate_bars, signal_time, gate_span)
+            lb = trend_gate[1]
+            if n <= lb:
+                note(fire, "FILTERED_TREND_GATE", "not enough history")
+                continue
+            now_c, then_c = gate_bars[n - 1].close, gate_bars[n - 1 - lb].close
+            trend = "LONG" if now_c > then_c else ("SHORT" if now_c < then_c else None)
+            if trend != side:
+                note(fire, "FILTERED_TREND_GATE", f"{trend_gate[0]} trend {trend}")
+                continue
         if open_trade and signal_time >= open_trade["entry_time"]:
             done = _walk(open_trade, bars, open_trade["entry_time"], signal_time, walk_cfg)
             if done:
@@ -141,6 +166,11 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
             note(fire, "SKIPPED_PAUSE")
             continue
         atr = atrs[j15 - 1]
+        if atr_unit == "1h":
+            atr = atrs_1h[j1 - 1] if j1 and atrs_1h[j1 - 1] else None
+            if not atr:
+                note(fire, "SKIPPED_NO_ATR")
+                continue
         # ---- ORDER -> EXECUTION
         if fakefill:
             # OLD FAKE FILL, kept only to reproduce the invalid pre-2026-10-04 numbers: the level is a trigger price, not a price you could get.
