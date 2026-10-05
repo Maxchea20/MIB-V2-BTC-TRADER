@@ -36,14 +36,15 @@ def main():
     gate_arg = next((a.split("=", 1)[1] for a in args if a.startswith("trend-gate=")), None)
     trend_gate = (gate_arg, 20) if gate_arg else None
     atr_unit = next((a.split("=", 1)[1] for a in args if a.startswith("atr-unit=")), "15m")
-    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill", "ideal-exits") + tuple(hunt_exits.MODES)
+    swing_only = "swing-only" in args
+    flags = ("trail-1atr", "room", "room-ex", "room-block", "realfill", "fakefill", "ideal-exits", "swing-only") + tuple(hunt_exits.MODES)
     paths = [a for a in args if a not in flags and "=" not in a] or [None]
     for raw in paths:
         db = research_db_path(raw)
         bars, info = load_bars(db, "BTC_USDT", None, None)
         print(f"{db.name} 1m={info.rows} trail_1atr={trail}")
         events = []
-        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill, exec_cfg, events, ideal_exits, trend_gate, atr_unit)
+        trades = _run(bars, resample(bars, "5m"), resample(bars, "15m"), resample(bars, "1h"), resample(bars, "4h"), trail, room, block, exitmode, fakefill, exec_cfg, events, ideal_exits, trend_gate, atr_unit, swing_only)
         name = "exp-hunt-desktop-cfi-trail1" if trail else "exp-hunt-desktop-cfi-v1"
         if room:
             name = f"exp-hunt-desktop-cfi-{room}{'-block' if block else ''}"
@@ -55,6 +56,8 @@ def main():
             name += f"-gate{trend_gate[0]}"
         if atr_unit != "15m":
             name += f"-unit{atr_unit}"
+        if swing_only:
+            name += "-swingonly"
         folder = ROOT / "results" / name / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         folder.mkdir(parents=True, exist_ok=True)
         with (folder / "trades.csv").open("w", newline="", encoding="utf-8") as handle:
@@ -70,6 +73,7 @@ def main():
         row["ideal_exits"] = ideal_exits
         row["trend_gate"] = trend_gate
         row["atr_unit"] = atr_unit
+        row["swing_only"] = swing_only
         row["execution"] = None if fakefill else asdict(exec_cfg)
         counts = {}
         for e in events:
@@ -79,7 +83,7 @@ def main():
         print(json.dumps(row, indent=2))
 
 
-def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False, exec_cfg=None, events=None, ideal_exits=False, trend_gate=None, atr_unit="15m"):
+def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False, exitmode=None, fakefill=False, exec_cfg=None, events=None, ideal_exits=False, trend_gate=None, atr_unit="15m", swing_only=False):
     """Hunt engine. SIGNAL (a FIRE) -> order -> fill or MISSED_FILL -> position -> exit. The strategy part (gate, weather, level, the 5m close answer)
     is unchanged. Who gets filled, at what price and when is decided by btc_research.execution.
     fakefill     the old invalid fill at the level with idealised exits (reproduces the pre-2026-10-04 numbers)
@@ -87,7 +91,8 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
     events       a list that receives one dict per FIRE (filled, skipped or missed), so nothing is silently dropped.
     trend_gate   optional ("1h"|"4h", lookback): only take FIREs in the direction of that trend (last closed close vs the close `lookback` bars earlier).
                  A FIRE against the trend is recorded as FILTERED_TREND_GATE. Default None = Hunt unchanged.
-    atr_unit     "15m" (Hunt as designed) or "1h": the ATR that sizes stop 1.5 / target 2.5 / floors. Default unchanged."""
+    atr_unit     "15m" (Hunt as designed) or "1h": the ATR that sizes stop 1.5 / target 2.5 / floors. Default unchanged.
+    swing_only   only take FIREs while the 4H/1H weather says SWING_UP / SWING_DOWN. CHOP-weather FIREs are recorded as FILTERED_CHOP_WEATHER. Default off."""
     exec_cfg = None if fakefill else (exec_cfg or ExecutionConfig())
     walk_cfg = None if (fakefill or ideal_exits) else exec_cfg
     if exec_cfg is not None and not exitmode:
@@ -144,6 +149,9 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         signal_bar = live[-1]
         signal_time = signal_bar.close_time
         fire = {"signal_time": signal_time, "signal_side": side, "signal_level": level, "signal_price": signal_bar.close, "event": event, "gate": gate, "weather": flag, "atr": atrs[j15 - 1]}
+        if swing_only and flag not in ("SWING_UP", "SWING_DOWN"):
+            note(fire, "FILTERED_CHOP_WEATHER")
+            continue
         if trend_gate:
             n = _closed(gate_bars, signal_time, gate_span)
             lb = trend_gate[1]

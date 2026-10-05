@@ -161,6 +161,19 @@ class TrendGate(unittest.TestCase):
             self.assertAlmostEqual((t["target"] - t["entry"]) * sign, 2.5 * atr_1h[n - 1])
 
 
+class SwingOnly(unittest.TestCase):
+    def test_chop_weather_fires_are_filtered_and_recorded(self):
+        bars = synthetic(40, 17)
+        r = [resample(bars, x) for x in ("5m", "15m", "1h", "4h")]
+        events = []
+        trades = eng._run(bars, *r, False, None, False, "floors", False, ExecutionConfig(), events, False, None, "15m", True)
+        self.assertTrue(all(t["weather"] in ("SWING_UP", "SWING_DOWN") for t in trades))
+        self.assertTrue(all((t["side"] == "LONG") == (t["weather"] == "SWING_UP") for t in trades))
+        self.assertTrue(any(e["status"] == "FILTERED_CHOP_WEATHER" and e["weather"] == "CHOP" for e in events))
+        allw = eng._run(bars, *r, False, None, False, "floors", False, ExecutionConfig(), None, False)
+        self.assertLess(len(trades), len(allw))
+
+
 class ChopExecution(unittest.TestCase):
     def setUp(self):
         self.cfg = ExecutionConfig()

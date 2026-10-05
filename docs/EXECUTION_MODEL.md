@@ -29,3 +29,7 @@ Tests: `python -m unittest discover tests` (45 tests).
 ## Trend-gate experiment (2026-10-05, pre-declared)
 `py scripts\trend_gate_experiment.py <file>` runs Hunt with floors under the realistic model four ways: ungated / gated by the 1H trend (last closed 1H close vs the close 20 hours earlier), each with the 15m ATR unit (Hunt as designed) and the 1H ATR unit (stop about 1% of price).
 Engine switches (default off): `trend-gate=1h|4h`, `atr-unit=1h`. A FIRE against the trend is recorded as `FILTERED_TREND_GATE`. Tests: `tests/test_execution_engine.py::TrendGate`.
+
+## Swing-only experiment (2026-10-05, pre-declared)
+`py scripts\swing_only_experiment.py <file>`: Hunt only while the weather says SWING_UP / SWING_DOWN (chop-weather FIREs are recorded as `FILTERED_CHOP_WEATHER`), no box, no chop book, realistic execution, floors on, with the 15m and the 1H ATR unit. CHoCH/BOS, side and gate splits are numbers only, nothing is tuned.
+Engine switch (default off): `swing-only`. Test: `tests/test_execution_engine.py::SwingOnly`.
