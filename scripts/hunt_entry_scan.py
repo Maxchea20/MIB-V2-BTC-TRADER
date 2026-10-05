@@ -101,12 +101,24 @@ def line(rows):
     return n, sum(x > 0 for x in a) / n, sum(a) / n, sum(bb) / n
 
 
-def main():
-    name = sys.argv[1]
+def trades_for(name):
+    """Real-fill Hunt trades (floors, realfill) for a research file. The engine run is cached: results\\hunt_realfill_<name>.path"""
+    cache = ROOT / "results" / f"hunt_realfill_{name}.path"
+    if cache.exists():
+        file = Path(cache.read_text().strip())
+        if file.exists():
+            return list(csv.DictReader(file.open(encoding="utf-8")))
     cmd = [sys.executable, str(ROOT / "scripts" / "backtest_desktop_cfi.py"), f"backend/{name}.db", "floors", "realfill"]
     text = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT, check=True).stdout
     file = Path(json.loads(text[text.index("{"):text.rindex("}") + 1])["file"])
-    trades = list(csv.DictReader(file.open(encoding="utf-8")))
+    cache.parent.mkdir(exist_ok=True)
+    cache.write_text(str(file))
+    return list(csv.DictReader(file.open(encoding="utf-8")))
+
+
+def main():
+    name = sys.argv[1]
+    trades = trades_for(name)
     bars, _ = load_bars(research_db_path(f"backend/{name}.db"), "BTC_USDT", None, None)
     rows = rows_for(bars, trades)
     n, w, a, b = line(rows)
