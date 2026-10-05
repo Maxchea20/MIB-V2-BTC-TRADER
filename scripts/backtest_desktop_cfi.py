@@ -143,7 +143,7 @@ def _run(bars, bars_5, bars_15, bars_1h, bars_4h, trail, room=None, block=False,
         # ---- SIGNAL: the 5m candle has closed. This is the earliest moment Hunt can know the condition is true.
         signal_bar = live[-1]
         signal_time = signal_bar.close_time
-        fire = {"signal_time": signal_time, "signal_side": side, "signal_level": level, "signal_price": signal_bar.close, "event": event, "gate": gate, "weather": flag}
+        fire = {"signal_time": signal_time, "signal_side": side, "signal_level": level, "signal_price": signal_bar.close, "event": event, "gate": gate, "weather": flag, "atr": atrs[j15 - 1]}
         if trend_gate:
             n = _closed(gate_bars, signal_time, gate_span)
             lb = trend_gate[1]
